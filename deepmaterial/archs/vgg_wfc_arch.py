@@ -92,6 +92,7 @@ class VGG_wfc(nn.Module):
                         filter[i,j] = weight[bandorigin.index(band)]
                         break
                     filter[i,j] = weight[9]
+        filter = filter.to('cuda')
 
         img = torch.mul(m_img,filter)
         # new_magnitude = 20*torch.log(torch.abs(img))
