@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 from deepmaterial.utils.registry import ARCH_REGISTRY
+from deepmaterial.archs.U_Net import *
 
 cfg = {
     'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
@@ -26,14 +27,15 @@ class VGG_wfc(nn.Module):
     def __init__(self, vgg_name='VGG19'):
         super(VGG_wfc, self).__init__()
         self.features = self._make_layers(cfg[vgg_name])
-        self.classifier = nn.Linear(512, 10) 
-        # self.filter = self.img_process()
+        self.classifier = nn.Linear(512*7*7, 10)
+        self.unet = UNet(3,4)
 
     def forward(self, x):
-        out = self.features(x)
-        out = out.view(out.size(0), -1)
+        out = self.features(x) #[batchsize,512,hc,wc]
+        out = out.view(out.size(0), -1) # [batchsize,longcharacter]
         out = self.classifier(out) # [batch_size,10]
-        out = self.img_process(x,out)
+        out = self.img_process(x,out) # image process layer, [batchsize,3,h,w]
+        out = self.unet(out)
         return out
 
     def _make_layers(self, cfg):
@@ -51,16 +53,14 @@ class VGG_wfc(nn.Module):
         return nn.Sequential(*layers)
 
     def fft(self,img):
-        # 转为Tensor
-        img_numpy = torch.tensor(img)
         # fourier transform
-        f_img = torch.fft.fft2(img_numpy) # complex64
+        f_img = torch.fft.fft2(img) # complex64
         # shift
         fshift_img = torch.fft.fftshift(f_img)
         t_magnitude = 20*torch.log(torch.abs(fshift_img))
         # 转为numpy array
-        magnitude = t_magnitude.numpy()
-        return fshift_img, magnitude
+        # magnitude = t_magnitude.numpy()
+        return fshift_img
 
     def dfft(self,m_img):
         ishift = torch.fft.ifftshift(m_img)
@@ -94,39 +94,39 @@ class VGG_wfc(nn.Module):
                     filter[i,j] = weight[9]
 
         img = torch.mul(m_img,filter)
-        new_magnitude = 20*torch.log(torch.abs(img))
-        return filter, new_magnitude
-        # filter conrrespond to weights
+        # new_magnitude = 20*torch.log(torch.abs(img))
+        return filter, img
+        # filter corresponds to weights, new_magnitude corresponds to complex value
 
     def img_process(self,img,l_weight):
         '''filter image with wieghts learnt
 
         Args:
-            img (tensor[batchsize,h,w,3]): original image 
+            img (tensor[batchsize,3,h,w]): original image 
             l_weight (tensor[batchsize,10])
         Return:
-            image filtered
+            image filtered(tensor[batchsize,3,h,w])
         '''
 
         batchsize = len(img)
         new_img = torch.ones_like(img) # new batchsize image
-        for idx in batchsize: # each image
+        for idx in range(batchsize): # each image
             image = img[idx]
             weight = l_weight[idx]
-            imgr = image[:,:,2]
-            imgg = image[:,:,1]
-            imgb = image[:,:,0]
-            fshift_imgr, magnitude_r = self.fft(imgr)
-            fshift_imgg, magnitude_g = self.fft(imgg)
-            fshift_imgb, magnitude_b = self.fft(imgb)
+            imgr = image[0,:,:] #RGB
+            imgg = image[1,:,:]
+            imgb = image[2,:,:]
+            fshift_imgr = self.fft(imgr)
+            fshift_imgg = self.fft(imgg)
+            fshift_imgb = self.fft(imgb)
             filter, imgr_passed = self.passfilter(fshift_imgr,weight)
             _, imgg_passed = self.passfilter(fshift_imgg,weight)
             _, imgb_passed = self.passfilter(fshift_imgb,weight)
             iimgr = self.dfft(imgr_passed)
             iimgg = self.dfft(imgg_passed)
             iimgb = self.dfft(imgb_passed) #[256,256]
-            new_image = torch.stack((iimgr,iimgg,iimgb),dim=2) #[256,256,3]
-            new_img[idx] = new_image
+            new_image = torch.stack((iimgr,iimgg,iimgb),dim=0) #[3,256,256]
+            new_img[idx] = new_image #[3,256,256]
         return new_img
 
 def test():
