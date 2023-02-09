@@ -260,10 +260,10 @@ def train_pipeline(root_path):
 
 if __name__ == '__main__':
     root_path = osp.abspath(osp.join(__file__, osp.pardir, osp.pardir))
-    root_path = "/home/sda/klkjjhjkhjhg/DeepMaterial"
+    root_path = "/home/cjm/DeepMaterial"
     train_pipeline(root_path)
 
 
 # conda activate ghpy37
 # cd /mnt/hard_disk/gaihe/code/BasicSR-master
-# python basicsr/train.py -opt options/train/MSVR/train_MSVR_Pcd8TSAReconsMeta_L1_F7G064Feat64.yml
+# python deepmaterial/train.py -opt options/train/VW/train_vw.yml

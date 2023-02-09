@@ -66,7 +66,7 @@ network_g:
 # path
 path:
   # pretrain_network_g: ~
-  strict_load_g: true
+  strict_load_g: false
   # resume_state: experiments/001_SurfaceNet/training_states/609.state
 
 # training settings

@@ -28,7 +28,7 @@ class VGG_wfc(nn.Module):
         super(VGG_wfc, self).__init__()
         self.features = self._make_layers(cfg[vgg_name])
         self.classifier = nn.Linear(512*8*8, 10)
-        self.unet = UNet(3,4)
+        self.unet = UNet(3,9)
 
     def forward(self, x):
         out = self.features(x) #[batchsize,512,hc,wc]
