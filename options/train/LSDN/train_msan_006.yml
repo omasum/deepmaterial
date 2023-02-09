@@ -1,0 +1,151 @@
+# general settings
+# name: 0001_MSAN_pointbaseline  # point, l1 loss, baseline, surface net
+# name: 0002_MSAN_SGLighting  # Spherical Gradient Illumination, l1 loss
+# name: 0003_MSAN_SingleTextureLighting  # SingleTextureLighting, l1 loss
+# name: 0004_MSAN_TexturingLightingLoss  # Texture lighting rendering for backpropagation, l1 loss + Render loss
+# name: 0005_MSAN_OptimizePattern  # Optimize the texture of lighting, l1 loss
+name: 0006_MSAN_twoStream  # two stream network for two-shot, radn+surfacenet l1 loss
+
+model_type: MSANTwoStreamModel
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+manual_seed: 10
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: areaDataset
+    type: areaDataset
+    brdf_args:
+      nbRendering: 1
+      size: 256
+      order: pndrs
+      toLDR: True
+      lampIntensity: 3
+    light_args:
+      type: RectLighting
+      texture: tmp/z.png
+      textureMode: Torch
+    # data_path: /home/hdr/disks/D/Datasets/svBRDFs/trainBlended
+    data_path: /home/sda/svBRDFs/trainBlended #Ruby
+    rendering_path: /home/sda/svBRDFs/
+    light_mode: area
+    input_mode: render
+    gamma: true
+    io_backend: 
+      type: disk
+    # data loader
+    use_shuffle: true
+    num_worker_per_gpu: 4
+    batch_size_per_gpu: 4
+    dataset_enlarge_ratio: 1
+    prefetch_mode: cuda
+    pin_memory: true
+
+  val:
+    name: areaDataset
+    type: areaDataset
+    brdf_args:
+      nbRendering: 1
+      size: 256
+      order: pndrs
+      toLDR: True
+    light_args:
+      type: RectLighting
+      texture: tmp/z.png
+      textureMode: Torch
+      lampIntensity: 3
+    # data_path: /home/hdr/disks/D/Datasets/svBRDFs/testBlended
+    gamma: true
+    data_path: /home/sda/svBRDFs/testBlended
+    rendering_path: /home/sda/svBRDFs/
+    light_mode: area
+    input_mode: render
+    io_backend: 
+      type: disk
+    len: 14
+
+# network structures
+network_g:
+  type: MSANTwoStreamNet
+  brdf_args:
+    nbRendering: 1
+    size: 256
+    order: pndrs
+    toLDR: True
+    lampIntensity: 3
+    type: RectLighting
+  optPattern: true
+  outputMapping:
+    Normal: 3
+    Diffuse: 3
+    Roughness: 1
+    Specular: 3
+
+network_pattern:
+  type: RADN
+  en_channels: [3, 64, 128, 256, 512, 512, 512, 512, 512]
+  de_channels: [512, 512, 512, 512, 512, 256, 128, 64, 64, 64, 3]
+  drop_layer: 3
+
+path:
+  # pretrain_network_g: ~
+  strict_load_g: true
+  # resume_state: /home/sda/klkjjhjkhjhg/DeepMaterial/experiments/0005_MSAN_OptimizePattern/training_states/81809.state
+# training settings
+train:
+  optim_g:
+    type: Adam
+    lr: !!float 4e-5
+    weight_decay: 0
+    betas: [0.9, 0.999]
+  optim_pattern:
+    type: Adam
+    lr: !!float 2e-5
+    weight_decay: 0
+    betas: [0.5, 0.999]
+  scheduler:
+    type: MultiStepRestartLR
+    milestones: [400000, 600000]
+    # milestones: [1,5,10,15]
+  total_iter: 400000
+  warmup_iter: -1  # no warm up
+
+  # losses
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 1
+    reduction: mean
+  # msssim_opt:
+  #   type: MSSSIMLoss
+  #   window_size: 11
+  #   normaliza: True
+  #   loss_weight: 0.88
+  # render_opt:
+  #   type: L1LogLoss
+  #   loss_weight: 1
+  #   reduction: mean
+  # gan_opt:
+  #   type: GANLoss
+  #   gan_type: vanilla
+  #   real_label_val: 1.0
+  #   fake_label_val: 0.0
+  #   loss_weight: 0.15
+
+# validation settings
+val:
+  val_freq: !!float 2e4
+  save_img: true
+
+  metrics:
+    # cosine: # metric name, can be arbitrary
+    #   type: cos
+    #   weight: 2
+    pixel: # metric name, can be arbitrary
+      type: pix
+      weight: 1
+
+# logging settings
+logger:
+  print_freq: 100
+  save_checkpoint_freq: !!float 5e4
+  use_tb_logger: true

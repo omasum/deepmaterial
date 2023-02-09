@@ -1,0 +1,82 @@
+
+name: 001_IRF_HOMO_300k
+
+model_type: IRFModel
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+# manual_seed: 10
+
+# dataset and data loader settings
+datasets:
+  test:
+    name: homoDataset
+    type: homoDataset
+    brdf_args:
+      split_num: 5
+      nbRendering: 1
+      split_axis: 1
+      concat: True
+      svbrdf_norm: True
+      size: 256
+      order: 'pndrs'
+      permute_channel: True
+      toLDR: True
+
+    rand_nb: false
+    rand_lv: true
+    mix_plane: false
+    len: 2
+    range_d: [0,1]
+    range_s: [0,1]
+    range_r: [0.1,0.8]
+    range_n: {"theta":[0,85],"phi":[0,360]}
+    nb: 300500
+# network structures
+network_g:
+  type: IRF
+  brdf_args:
+    split_num: 5
+    nbRendering: 1
+    split_axis: 1
+    concat: True
+    svbrdf_norm: True
+    size: 1024
+    order: 'pndrs'
+    toLDR: True
+  num_in_ch: 15
+  num_out_ch: 7
+  attn_fusion: False
+  encode_layer: [
+    [256,512],
+    [512,512]
+  ]
+  midcode_layer: [
+    [1024,512],
+    [512,512]
+  ]
+  decode_layer: [
+    [512,512],
+    [512,256]
+  ]
+  attn_layer: [
+    [512,512],
+    [512,512]
+  ]
+
+# path
+path:
+  pretrain_network_g: experiments/007_IRF_HOMO_600k_B128/models/net_g_latest.pth
+  strict_load_g: true
+
+# validation settings
+val:
+  save_img: true
+  save_num: 5
+  suffix: HOMO  # add suffix to saved images, if None, use exp name
+
+  metrics:
+    # cosine: # metric name, can be arbitrary
+    #   type: cos
+    #   weight: 2
+    pixel: # metric name, can be arbitrary
+      type: pix
+      weight: 1

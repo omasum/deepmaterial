@@ -1,0 +1,135 @@
+# general settings
+name: 001_CSME
+
+model_type: CSMEModel
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+manual_seed: 100
+clear_imgs: ture
+clear_logs: ture
+mode: 'gn+c'
+real_input: false
+
+network_n:
+  type: StyleGAN2Generator
+  out_size: 256
+  num_style_feat: 512
+  # narrow: 1
+  num_mlp: 8
+  channel_multiplier: 2
+  resample_kernel: [1, 3, 3, 1]
+  lr_mlp: 0.01
+  brdf: false
+
+# network structures
+network_g:
+  type: IRF
+  start_nc: 5
+  style_n: False
+  brdf_args:
+    split_num: 4
+    nbRendering: 5
+    eval_nbRendering: 5
+    split_axis: 1
+    concat: True
+    svbrdf_norm: True
+    size: 256
+    order: 'ndrs'
+    toLDR: True
+  num_in_ch: 15
+  num_out_ch: 7
+  attn_fusion: False
+  encode_layer: [
+    [256,512],
+    [512,512]
+  ]
+  midcode_layer: [
+    [1024,512],
+    [512,512]
+  ]
+  decode_layer: [
+    [512,512],
+    [512,256]
+  ]
+  attn_layer: [
+    [512,512],
+    [512,512]
+  ]
+
+# path
+path:
+  # pretrain_network_g: 'experiments\\001_IRF_HOMO_300k\\models\\net_g_250000.pth'
+  # pretrain_network_g: experiments/003_IRF_HOMO_600k_B128/models/net_g_600000.pth
+  pretrain_network_g: experiments/007_IRF_HOMO_600k_B128/models/net_g_latest.pth
+  pretrain_network_n: experiments/501_StyleGAN2_256_Cmul2_FFHQ_800k_B24G8_scratch/models/net_g_400000.pth
+  # pretrain_network_g: experiments/005_IRF_HOMO_600k_B128/models/net_g_latest.pth
+  strict_load_g: true
+  # input_img: 'D:\\Datasets\\svBRDFs\\testBlended\\0000033;brick_uneven_stonesXPolishedMarbleFloor_01;2Xdefault.png'
+  input_img: /home/hdr/disks/D/Datasets/svBRDFs/testBlended/0000068;leather_tilesXbrick_uneven_stones;defaultX1.png
+  # input_img: datasets/data/white_paper/lr_miniimages/14.png
+  init_latent: datasets/init.pth
+
+train_material:
+  optim:
+    type: Adam
+    lr: !!float 1e-3
+    weight_decay: 0
+    betas: [0.9, 0.99]
+  total_iter: 10000
+  
+
+# training settings
+train:
+  optim_g:
+    type: Adam
+    lr: !!float 1e-1
+    weight_decay: 0
+    betas: [0.9, 0.99]
+
+  scheduler:
+    type: MultiStepLR
+    milestones: [20000]
+    gamma: 0.5
+  # scheduler:
+  #   type: CosineAnnealingRestartLR
+  #   periods: [5000, 5000]
+  #   restart_weights: [0.5, 0.25]
+  #   eta_min: !!float 1e-1
+
+  total_iter: 10000
+  warmup_iter: -1  # no warm up
+
+  # losses
+  pixel_opt:
+    type: SmoothL1Loss
+    loss_weight: 1
+    reduction: mean
+  # perceptual_opt:
+  #   type: PerceptualLoss
+  #   layer_weights:
+  #     # 'conv2_2': 1  # before relu
+  #     # 'conv3_4': 1  # before relu
+  #     'conv5_4': 1  # before relu
+  #   vgg_type: vgg19
+  #   use_input_norm: true
+  #   range_norm: false
+  #   perceptual_weight: 0.001
+  #   style_weight: 0
+  #   criterion: l1
+  # losses
+  # cos_opt:
+  #   type: CosineLoss
+  #   loss_weight: 0.5
+  #   reduction: mean
+  split_freq: 2000
+
+val:
+  val_freq: !!float 4e2
+  trace_freq: !!float 2e0
+  opt_freq: !!float 5e0
+  save_num: 5
+
+# logging settings
+logger:
+  print_freq: 100
+  save_checkpoint_freq: !!float 2e4
+  use_tb_logger: true

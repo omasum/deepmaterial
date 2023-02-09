@@ -1,0 +1,10 @@
+build
+experiments
+tb_logger
+tmp
+results
+datasets
+.eggs
+deepmaterial.egg-info
+__pycache__
+docs

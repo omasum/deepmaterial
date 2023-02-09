@@ -1,0 +1,117 @@
+name: META_Lx2_f256b32_DIV2K_TEST
+model_type: MetaRDN
+scale: [2.0, 2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
+# scale: [2.0, 2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+manual_seed: 10
+fix_hr: true
+print_net_g: false
+# lq_root: datasets/B100/LR_bicubic
+
+datasets:
+  test:
+    name: msVid4
+    type: msVid4
+    dataroot_gt: D:\VSProject\BasicSR-master\datasets\Vid4\gt
+    dataroot_lq: D:/Datasets/vid4_matlabX1_X4
+    io_backend:
+      type: disk
+
+    cache_data: false
+    num_frame: 7
+    padding: reflection_circle
+    fixed_scale: 2.3
+  # test:  # the 1st test dataset
+  #   name: Vimeo90K-Test
+  #   type: VideoTestVimeo90KDatasetMETA
+  #   dataroot_gt: datasets/vimeo90k/vimeo_septuplet/sequences
+  #   dataroot_lq: datasets/vimeo90k/vimeo_septuplet_matlabLRx4/sequences
+  #   lq_root: /home/ext/gaihe/vimeo90kMETA
+  #   meta_info_file: basicsr/data/meta_info/meta_info_Vimeo90K_test_GT.txt
+  #   io_backend:
+  #     type: disk
+  #   cache_data: false
+  #   num_frame: 1
+  #   scale: 4.0
+  #   padding: reflection_circle
+  #   useDir: False
+  # test:  # the 1st test dataset
+  #   name: B100-Test
+  #   type: PairedImageDatasetMETATest
+  #   dataroot_gt: datasets/B100/HR
+  #   dataroot_lq: datasets/B100/LR_bicubic
+  #   io_backend:
+  #     type: disk
+  # test:
+  #   name: msVimeo90K-Test
+  #   type: msVimeo90KDatasetTest
+  #   dataroot_gt: D:/Datasets/vimeo_septuplet/sequences
+  #   dataroot_lq: D:/Datasets/vimeo_septuplet_matlab_X1_X4
+  #   meta_info_file: basicsr/data/meta_info/meta_info_Vimeo90K_test_GT_00001.txt
+  #   # meta_info_file: basicsr/data/meta_info/meta_info_Vimeo10K_test_GT.txt
+  #   # change to 'meta_info_REDSofficial4_test_GT' when use the official validation partition
+  #   io_backend:
+  #     type: disk
+    
+  #   num_frame: 7
+  #   padding: reflection_circle
+
+  #   cache_data: false
+  #   random_reverse: false
+  #   use_flip: false
+  #   use_rot: false
+  #   use_edge: false
+    
+  #   use_shuffle: false
+  #   num_worker_per_gpu: 1
+  #   batch_size_per_gpu: 1
+  #   prefetch_mode: muti-scale
+  #   pin_memory: true
+  #   fixed_scale: 2.5
+  #   OTFMode: PIL 
+
+# network structures
+network_g:
+  type: META
+  num_in_ch: 16
+  num_out_ch: 16
+  # num_feat: 64
+  num_block: 16
+  nConv: 8
+  n_colors: 3
+  scale: [2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
+  G0: 16
+  kSize: 3
+  # res_scale: 0.1
+  img_range: 1.
+  rgb_mean: [0.4488, 0.4371, 0.4040]
+  rgb_std: [1.0, 1.0, 1.0]
+  ConstantWeightUpsample: false
+  is_component: false
+  F0: 16
+  with_edge: false
+  with_lr: false
+  with_videoPosMatrix: false
+
+# path
+path:
+  pretrain_network_g: D:/VSProject/BasicSR-master/experiments/META_DIV2K/models/net_g_latest.pth
+  # pretrain_network_g: /mnt/hard_disk/gaihe/code/BasicSR-master/experiments/pretrained_models/META/model_1000.pt
+  strict_load_g: true
+  param_key: None
+
+# validation settings
+val:
+  save_img: true
+  suffix: ~  # add suffix to saved images, if None, use exp name
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calc_psnr
+      scale: 2.0
+      test_y_channel: false
+    ssim:
+      type: calculate_ssim
+      crop_border: 0
+      test_y_channel: false
+

@@ -1,0 +1,142 @@
+# general settings
+name: 1001_META_Lx4_f256b32_B100_300k_B16G1_wandb
+model_type: MetaRDN
+scale: [2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+manual_seed: 10
+fix_hr: true
+print_net_g: true
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: Vimeo90K
+    type: msVimeo90KDataset
+    dataroot_gt: /mnt/hard_disk/gaihe/datasets/vimeo_septuplet/sequences
+    dataroot_lq: /mnt/hard_disk/gaihe/datasets/vimeo_septuplet_matlab_X1_X4
+    dataroot_flow: ~
+    meta_info_file: basicsr/data/meta_info/meta_info_Vimeo10K_train_GT.txt
+    # val_partition: REDS4  # set to 'official' when use the official validation partition
+    io_backend:
+      type: disk
+
+    num_frame: 7
+    lq_size: 64
+    interval_list: [1]
+    random_reverse: false
+    use_flip: true
+    use_rot: true
+    use_edge: false
+
+    # data loader
+    use_shuffle: true
+    num_worker_per_gpu: 1
+    batch_size_per_gpu: 4
+    dataset_enlarge_ratio: 1
+    prefetch_mode: muti-scale
+    pin_memory: true
+
+  val:
+    name: msVimeo90K-Test
+    type: msVimeo90KDatasetTest
+    dataroot_gt: /mnt/hard_disk/gaihe/datasets/vimeo_septuplet/sequences
+    dataroot_lq: /mnt/hard_disk/gaihe/datasets/vimeo_septuplet_matlab_X1_X4
+    meta_info_file: basicsr/data/meta_info/meta_info_Vimeo90K_test_GT_00001.txt
+    # meta_info_file: basicsr/data/meta_info/meta_info_Vimeo10K_test_GT.txt
+    # change to 'meta_info_REDSofficial4_test_GT' when use the official validation partition
+    io_backend:
+      type: disk
+    
+    num_frame: 7
+    padding: reflection_circle
+
+    cache_data: false
+    random_reverse: false
+    use_flip: false
+    use_rot: false
+    use_edge: false
+    
+    use_shuffle: false
+    num_worker_per_gpu: 1
+    batch_size_per_gpu: 1
+    prefetch_mode: muti-scale
+    pin_memory: true
+    fixed_scale: 4.0
+    OTFMode: PIL 
+
+# network structures
+network_g:
+  type: META
+  num_in_ch: 16
+  num_out_ch: 16
+  # num_feat: 64
+  num_block: 8
+  nConv: 8
+  n_colors: 3
+  scale: [2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
+  G0: 16
+  kSize: 3
+  # res_scale: 0.1
+  img_range: 1.
+  rgb_mean: [0.4488, 0.4371, 0.4040]
+  rgb_std: [1.0, 1.0, 1.0]
+  ConstantWeightUpsample: false
+  is_component: false
+  F0: 16
+  with_edge: false
+  with_lr: false
+  with_videoPosMatrix: false
+
+# path
+path:
+  # pretrain_network_g: experiments/204_EDSR_Lx2_f256b32_DIV2K_300k_B16G1_wandb/models/net_g_300000.pth
+  strict_load_g: false
+  resume_state: ~
+
+# training settings
+train:
+  optim_g:
+    type: Adam
+    lr: !!float 1e-4
+    weight_decay: 0
+    betas: [0.9, 0.999]
+
+  scheduler:
+    type: MultiStepRestartLR
+    milestones: [200000, 100000, 150000, 150000, 150000, 300000, 300000, 600000, 600000]
+    gamma: 0.5
+    restart_weights: [1]
+
+  total_iter: 600000
+  warmup_iter: -1  # no warm up
+
+  # losses
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 1.0
+    reduction: mean
+
+# validation settings
+val:
+  val_freq: !!float 5e4
+  save_img: true
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calc_psnr
+      scale: 2.0
+      test_y_channel: false
+
+# logging settings
+logger:
+  print_freq: 100
+  save_checkpoint_freq: !!float 5e4
+  use_tb_logger: true
+  wandb:
+    project: ~
+    resume_id: ~
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500

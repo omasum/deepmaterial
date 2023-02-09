@@ -1,0 +1,159 @@
+#python basicsr/test.py -opt options/test/MSVR/test_MSVR_EDVRM.yml
+# name: Exp26-XS
+# name: Exp36-XS
+# name: EDVR-change-XS
+# name: EDVR-final
+# name: Bicubic-continue
+# name: M1-DEBUG
+name: M2-Vimeo
+# name: Exp39-XS
+model_type: MSVRModel
+scale: [2.0, 2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
+# scale: [4.0]
+# scale: [3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
+# fixed_net_g_scale: 4
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+fix_hr: true
+manual_seed: 10
+accumulation_steps: 1
+print_net_g: false
+
+datasets:
+  # test:
+  #   name: Vid4
+  #   type: VideoTestDataset
+  #   dataroot_gt: datasets/Vid4/gt
+  #   dataroot_lq: datasets/Vid4/bicubic
+  #   io_backend:
+  #     type: disk
+
+  #   cache_data: false
+  #   num_frame: 7
+  #   padding: reflection_circle
+  test:
+    name: msVimeo90K-Test
+    type: msVimeo90KDatasetTest
+    dataroot_gt: /mnt/hard_disk/gaihe/datasets/vimeo_septuplet/sequences
+    dataroot_lq: /mnt/hard_disk/gaihe/datasets/vimeo_septuplet_matlab_X1_X4
+    # meta_info_file: basicsr/data/meta_info/meta_info_Vimeo90K_test_GT_00001.txt
+    meta_info_file: basicsr/data/meta_info/meta_info_Vimeo10K_test_GT.txt
+    # change to 'meta_info_REDSofficial4_test_GT' when use the official validation partition
+    io_backend:
+      type: disk
+    
+    num_frame: 7
+    padding: reflection_circle
+
+    cache_data: false
+    random_reverse: false
+    use_flip: false
+    use_rot: false
+    use_edge: false
+    
+    use_shuffle: false
+    num_worker_per_gpu: 1
+    batch_size_per_gpu: 1
+    prefetch_mode: muti-scale
+    pin_memory: true
+    fixed_scale: 4.0
+    OTFMode: PIL
+  # test:
+  #   name: Vimeo90K-Test
+  #   type: Vimeo90KDatasetOTFTest
+  #   dataroot_gt: /mnt/hard_disk/gaihe/datasets/vimeo_septuplet/sequences
+  #   dataroot_lq: /mnt/hard_disk/gaihe/datasets/vimeo_septuplet/sequences
+  #   meta_info_file: basicsr/data/meta_info/meta_info_Vimeo90K_test_GT_00001.txt
+  #   # change to 'meta_info_REDSofficial4_test_GT' when use the official validation partition
+  #   io_backend:
+  #     type: disk
+    
+  #   num_frame: 7
+  #   padding: reflection_circle
+
+  #   cache_data: false
+  #   random_reverse: false
+  #   use_flip: false
+  #   use_rot: false
+  #   use_edge: false
+    
+  #   use_shuffle: false
+  #   num_worker_per_gpu: 1
+  #   batch_size_per_gpu: 1
+  #   prefetch_mode: muti-scale
+  #   pin_memory: true
+  #   fixed_scale: 2.3
+  #   OTFMode: PIL
+
+# network structures
+network_g:
+  type: MSVR
+  num_in_ch: 3
+  num_out_ch: 3
+  num_feat: 16
+  kSize: 3
+  num_edge_feat: 16
+  num_frame: 7
+  deformable_groups: 8
+  num_extract_block: 5
+  num_reconstruct_block: 20
+  center_frame_idx: ~
+  hr_in: false
+  is_bicubic: false
+  vis_feature: false
+  pix_attn: false
+  with_pcd: false
+  with_cd: true
+  with_recons: true
+  with_tsa: false
+  with_tsanp: true
+  with_meta: true
+  with_uwlb: false
+  uwlb_args:
+    with_offset: true
+    with_feature: true
+    with_gradBack: true
+    # scale: [4.0]
+    scale: [2.0, 2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
+  with_edge: false
+  with_lr: false
+  with_scalefilter: false
+  with_scaleAware: true
+  with_videoPosMatrix: false
+  with_resNfMeta: false
+  with_onlyMeta: false
+  with_resMeta: true
+  with_resFeat: false
+  meta_args:
+    # num_feat: 64
+    num_block: 16
+    nConv: 8
+    n_colors: 3
+    scale: [2.0, 2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
+    # scale: [2.0, 2.5, 3.0, 3.5, 4.0]
+    # scale: [4.0]
+    G0: 16
+    F0: 16
+    # res_scale: 0.1
+    img_range: 1.
+    rgb_mean: [0.4488, 0.4371, 0.4040]
+    rgb_std: [1.0, 1.0, 1.0]
+    ConstantWeightUpsample: false
+# path
+path:
+  pretrain_network_g: experiments/pretrained_models/final2/m2/model.pth
+  strict_load_g: true
+
+# validation settings
+val:
+  save_img: true
+  suffix: ~  # add suffix to saved images, if None, use exp name
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calc_psnr
+      scale: 2.0
+      test_y_channel: false
+    ssim:
+      type: calculate_ssim
+      crop_border: 0
+      test_y_channel: false

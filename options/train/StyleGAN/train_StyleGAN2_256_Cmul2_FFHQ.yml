@@ -1,0 +1,118 @@
+# general settings
+name: 501_StyleGAN2_256_Cmul2_FFHQ_800k_B24G8_scratch
+model_type: StyleGAN2Model
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+manual_seed: 10
+
+brdf_args:
+  split_num: 5
+  nbRendering: 1
+  split_axis: 1
+  concat: true
+  svbrdf_norm: true
+  size: 256
+  order: pndrs
+  permute_channel: true
+  toLDR: true
+  # gamma_correct: drs
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: brdf
+    type: normalDataset
+    brdf_args:
+      nbRendering: 1
+      size: 256
+      split_num: 5
+      split_axis: 1
+      concat: true
+      svbrdf_norm: true
+      permute_channel: true
+      order: pndrs
+    # dataroot_train: D:/Datasets/svBRDFs/testBlended
+    dataroot_train: /home/hdr/disks/D/Datasets/svBRDFs/trainBlended
+    io_backend:
+      type: disk
+
+    # data loader
+    use_shuffle: true
+    num_worker_per_gpu: 2
+    batch_size_per_gpu: 8
+    dataset_enlarge_ratio: 100
+    prefetch_mode: cuda
+    pin_memory: true
+
+# network structures
+network_g:
+  type: StyleGAN2Generator
+  out_size: 256
+  num_style_feat: 512
+  # narrow: 1
+  num_mlp: 8
+  channel_multiplier: 2
+  resample_kernel: [1, 3, 3, 1]
+  lr_mlp: 0.01
+  brdf: false
+
+network_d:
+  type: StyleGAN2Discriminator
+  out_size: 256
+  channel_multiplier: 2
+  resample_kernel: [1, 3, 3, 1]
+
+# path
+path:
+  pretrain_network_g: ~
+  strict_load_g: true
+  resume_state: experiments/501_StyleGAN2_256_Cmul2_FFHQ_800k_B24G8_scratch/training_states/328000.state
+
+# training settings
+train:
+  optim_g:
+    type: Adam
+    lr: !!float 2e-3
+
+  optim_d:
+    type: Adam
+    lr: !!float 2e-3
+
+  scheduler:
+    type: MultiStepLR
+    milestones: [600000]
+    gamma: 0.5
+
+  total_iter: 800000
+  warmup_iter: -1  # no warm up
+
+  # losses
+  gan_opt:
+    type: GANLoss
+    gan_type: wgan_softplus
+    loss_weight: !!float 1
+  # r1 regularization for discriminator
+  r1_reg_weight: 10
+  # path length regularization for generator
+  path_batch_shrink: 2
+  path_reg_weight: 2
+
+  net_g_reg_every: 8
+  net_d_reg_every: 16
+  mixing_prob: 0.9
+
+  net_d_iters: 1
+  net_d_init_iters: 0
+
+# validation settings
+val:
+  val_freq: !!float 5e3
+  save_img: true
+
+# logging settings
+logger:
+  print_freq: 100
+  save_checkpoint_freq: !!float 5e3
+  use_tb_logger: true
+  wandb:
+    project: ~
+    resume_id: ~

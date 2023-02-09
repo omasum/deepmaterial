@@ -1,0 +1,128 @@
+# general settings
+name: META_DIV2K
+model_type: MetaRDN
+scale: [2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+manual_seed: 10
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: DIV2K
+    type: PairedImageDatasetMETA
+    # dataroot_gt: D:/Datasets/DIV2K/DIV2K_train_HR
+    # dataroot_lq: D:/Datasets/DIV2K/DIV2K_BI
+    dataroot_gt: C:/Datasets/DIV2K/DIV2K_train_HR
+    dataroot_lq: D:\Datasets\DIV2K\DIV2K_matlabX1_X4
+    # dataroot_gt: D:\Datasets\B100\HR
+    # dataroot_lq: D:\Datasets\B100\LR_bicubic
+    # (for lmdb)
+    # dataroot_gt: datasets/DIV2K/DIV2K_train_HR_sub.lmdb
+    # dataroot_lq: datasets/DIV2K/DIV2K_train_LR_bicubic_X4_sub.lmdb
+    filename_tmpl: '{}'
+    io_backend:
+      type: disk
+      # (for lmdb)
+      # type: lmdb
+
+    lq_size: 50
+    use_flip: true
+    use_rot: true
+
+    # data loader
+    use_shuffle: false
+    num_worker_per_gpu: 6
+    batch_size_per_gpu: 16
+    dataset_enlarge_ratio: 200
+    prefetch_mode: muti-scale
+    pin_memory: True
+
+  val:
+    name: DIV2K
+    type: PairedImageDatasetMETA
+    dataroot_gt: C:/Datasets/DIV2K/DIV2K_valid_HR
+    dataroot_lq: D:\Datasets\DIV2K\DIV2K_matlabX1_X4
+    # dataroot_gt: D:\Datasets\B100\HR
+    # dataroot_lq: D:\Datasets\B100\LR_bicubic
+    prefetch_mode: muti-scale
+    num_worker_per_gpu: 1
+    batch_size_per_gpu: 1
+    pin_memory: True
+    io_backend:
+      type: disk
+
+# network structures
+network_g:
+  type: META
+  num_in_ch: 16
+  num_out_ch: 16
+  # num_feat: 64
+  num_block: 16
+  nConv: 8
+  n_colors: 3
+  scale: [2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0]
+  G0: 16
+  kSize: 3
+  # res_scale: 0.1
+  img_range: 1.
+  rgb_mean: [0.4488, 0.4371, 0.4040]
+  rgb_std: [1.0, 1.0, 1.0]
+  ConstantWeightUpsample: false
+  is_component: false
+  F0: 16
+  with_edge: false
+  with_lr: false
+  with_videoPosMatrix: false
+
+# path
+path:
+  # pretrain_network_g: experiments/204_EDSR_Lx2_f256b32_DIV2K_300k_B16G1_wandb/models/net_g_300000.pth
+  strict_load_g: false
+  resume_state: experiments\META_DIV2K\training_states\117439.state
+
+# training settings
+train:
+  optim_g:
+    type: Adam
+    lr: !!float 1e-4
+    weight_decay: 0
+    betas: [0.9, 0.999]
+
+  scheduler:
+    type: MultiStepLR
+    milestones: [36800, 73600, 110400, 147200]
+    gamma: 0.5
+
+  total_iter: 184000
+  warmup_iter: -1  # no warm up
+
+  # losses
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 1.0
+    reduction: mean
+
+# validation settings
+# val:
+  # val_freq: 
+  # save_img: true
+
+  # metrics:
+  #   psnr: # metric name, can be arbitrary
+  #     type: calc_psnr
+  #     scale: 2.0
+  #     test_y_channel: true
+
+# logging settings
+logger:
+  print_freq: 100
+  save_checkpoint_freq: !!float 1e4
+  use_tb_logger: true
+  wandb:
+    project: ~
+    resume_id: ~
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500

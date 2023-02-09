@@ -1,0 +1,59 @@
+# general settings
+name: 501_StyleGAN2
+model_type: StyleGAN2Model
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+manual_seed: 10
+
+brdf_args:
+  split_num: 5
+  nbRendering: 1
+  split_axis: 1
+  concat: true
+  svbrdf_norm: true
+  size: 256
+  order: pndrs
+  permute_channel: true
+  toLDR: true
+  # gamma_correct: drs
+
+# dataset and data loader settings
+datasets:
+  test:
+    name: brdf
+    type: normalDataset
+    brdf_args:
+      nbRendering: 1
+      size: 256
+      split_num: 5
+      split_axis: 1
+      concat: true
+      svbrdf_norm: true
+      permute_channel: true
+      order: pndrs
+    # dataroot_train: D:/Datasets/svBRDFs/testBlended
+    dataroot_train: /home/hdr/disks/D/Datasets/svBRDFs/trainBlended
+    io_backend:
+      type: disk
+
+
+# network structures
+network_g:
+  type: StyleGAN2Generator
+  out_size: 256
+  num_style_feat: 512
+  # narrow: 1
+  num_mlp: 8
+  channel_multiplier: 2
+  resample_kernel: [1, 3, 3, 1]
+  lr_mlp: 0.01
+  brdf: false
+# path
+path:
+  pretrain_network_g: ~
+  strict_load_g: true
+  resume_state: experiments/501_StyleGAN2_256_Cmul2_FFHQ_800k_B24G8_scratch/models/net_g_400000.pth
+
+# validation settings
+val:
+  save_img: true
+

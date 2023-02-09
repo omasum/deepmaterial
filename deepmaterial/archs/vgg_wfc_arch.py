@@ -27,7 +27,7 @@ class VGG_wfc(nn.Module):
     def __init__(self, vgg_name='VGG19'):
         super(VGG_wfc, self).__init__()
         self.features = self._make_layers(cfg[vgg_name])
-        self.classifier = nn.Linear(512*7*7, 10)
+        self.classifier = nn.Linear(512*8*8, 10)
         self.unet = UNet(3,4)
 
     def forward(self, x):
