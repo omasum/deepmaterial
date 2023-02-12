@@ -53,8 +53,16 @@ class VGG_wfc(nn.Module):
         return nn.Sequential(*layers)
 
     def fft(self,img):
-        # fourier transform
-        f_img = torch.fft.fft2(img) # complex64
+        '''fourier transform of image
+
+        Args:
+            img (tensor.float[batchsize,3,h,w]): original images
+
+        Returns:
+            fshift_img(tensor.complex[batchsize,3,h,w]): images after fourier transform
+        '''
+       # fourier transform
+        f_img = torch.fft.fft2(img) # complex64[batchsize,3,h,w]
         # shift
         fshift_img = torch.fft.fftshift(f_img)
         t_magnitude = 20*torch.log(torch.abs(fshift_img))
@@ -63,6 +71,14 @@ class VGG_wfc(nn.Module):
         return fshift_img
 
     def dfft(self,m_img):
+        '''dfft of passfiltered images
+
+        Args:
+            m_img (tensor.complex[batchsize,3,h,w]): frequency domain images
+
+        Returns:
+            iimg(tensor.float[batchsize,3,h,w]): images
+        '''
         ishift = torch.fft.ifftshift(m_img)
         ifft = torch.fft.ifft2(ishift)
         iimg = torch.abs(ifft)
@@ -70,9 +86,18 @@ class VGG_wfc(nn.Module):
         return iimg
 
     # filter: 10 weights of solid frequency stage
-    def passfilter(self,m_img,weight):
+    def filter(self,m_img,weight):
+        '''build filter using weight
+
+        Args:
+            m_img (tensor.float[batchsize,3,h,w]): original image, support shape for filter
+            weight (tensor.float[batchsize,10]): output of classify layers
+
+        Returns:
+            tensor.float[batchsize,3,h,w]: filter
+        '''
         # imgm[h,w]
-        h,w = m_img.shape[0:2] 
+        batchsize, channel, h, w = m_img.shape[0:4] #(8,3,256,256)
         # find origin
         h0,w0 = int(h/2),int(w/2) 
         # define 9 band
@@ -83,51 +108,52 @@ class VGG_wfc(nn.Module):
             bandorigin.append((2*idx-1)/2*bandwidth)
 
         # define filter
-        filter = torch.zeros(size=(h,w))
+        filter = torch.zeros(size=(batchsize,h,w)) #(8,256,256)
         for i in range(0,w):
             for j in range(0,h):
                 r = math.sqrt(pow(i-w0,2)+pow(j-h0,2))
                 for band in bandorigin:
-                    if band-bandwidth/2<r<band+bandwidth/2:
-                        filter[i,j] = weight[bandorigin.index(band)]
+                    if band-bandwidth/2< r <band+bandwidth/2:
+                        filter[:,i,j] = weight[:,bandorigin.index(band)]
                         break
-                    filter[i,j] = weight[9]
+                    filter[:,i,j] = weight[:,9]
+        filter = filter.unsqueeze(1) # (8,1,256,256)
+        filter = filter.expand(-1,3,-1,-1) # (8,3,256,256)
+        return filter
+        # filter corresponds to weights, new_magnitude corresponds to complex value
+
+        # passfilter of images(R,G,B repectively)
+    def passfilter(self,m_img,filter):
+        '''passfilter for frequency domain image
+
+        Args:
+            m_img (tensor.complex[batchsize,3,h,w]): after fft image
+            filter (tensor.float[batchsize,3,h,w]): filter
+        Returns:
+            tensor.complex[batchsize,3,h,w]: new image
+        '''
         filter = filter.to('cuda')
 
         img = torch.mul(m_img,filter)
         # new_magnitude = 20*torch.log(torch.abs(img))
-        return filter, img
-        # filter corresponds to weights, new_magnitude corresponds to complex value
+        return img
+        # img corresponds to complex value
 
     def img_process(self,img,l_weight):
         '''filter image with wieghts learnt
 
         Args:
-            img (tensor[batchsize,3,h,w]): original image 
-            l_weight (tensor[batchsize,10])
+            img (tensor.float[batchsize,3,h,w]): original image 
+            l_weight (tensor.float[batchsize,10])
         Return:
-            image filtered(tensor[batchsize,3,h,w])
+            image filtered(tensor.float[batchsize,3,h,w])
         '''
 
-        batchsize = len(img)
         new_img = torch.ones_like(img) # new batchsize image
-        for idx in range(batchsize): # each image
-            image = img[idx]
-            weight = l_weight[idx]
-            imgr = image[0,:,:] #RGB
-            imgg = image[1,:,:]
-            imgb = image[2,:,:]
-            fshift_imgr = self.fft(imgr)
-            fshift_imgg = self.fft(imgg)
-            fshift_imgb = self.fft(imgb)
-            filter, imgr_passed = self.passfilter(fshift_imgr,weight)
-            _, imgg_passed = self.passfilter(fshift_imgg,weight)
-            _, imgb_passed = self.passfilter(fshift_imgb,weight)
-            iimgr = self.dfft(imgr_passed)
-            iimgg = self.dfft(imgg_passed)
-            iimgb = self.dfft(imgb_passed) #[256,256]
-            new_image = torch.stack((iimgr,iimgg,iimgb),dim=0) #[3,256,256]
-            new_img[idx] = new_image #[3,256,256]
+        filter = self.filter(img,l_weight)
+        f_img = self.fft(img)
+        passed_img = self.passfilter(f_img,filter)
+        new_img = self.dfft(passed_img)
         return new_img
 
 def test():

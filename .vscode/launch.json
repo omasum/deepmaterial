@@ -62,6 +62,17 @@
             ]
         },
         {
+            "name": "vw_train",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-opt",
+                "options/train/VW/train_vw.yml"
+            ]
+        },
+        {
             "name": "radn_test",
             "type": "python",
             "request": "launch",
