@@ -80,7 +80,7 @@ train:
     type: MultiStepRestartLR
     milestones: [600000, 600000]
     # milestones: [1,5,10,15]
-  total_iter: 400000
+  total_iter: 250000 # 400000
   warmup_iter: -1  # no warm up
 
   # losses
@@ -108,6 +108,6 @@ val:
 
 # logging settings
 logger:
-  print_freq: 100
+  print_freq: 1 #100
   save_checkpoint_freq: !!float 5e4
   use_tb_logger: true

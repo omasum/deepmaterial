@@ -91,7 +91,7 @@ class VGG_wfc(nn.Module):
 
         Args:
             m_img (tensor.float[batchsize,3,h,w]): original image, support shape for filter
-            weight (tensor.float[batchsize,10]): output of classify layers
+            weight (tensor.float[batchsize,10]): output of classify layers, 3 channels of an image share the same weights however each image has different weights
 
         Returns:
             tensor.float[batchsize,3,h,w]: filter
@@ -99,26 +99,29 @@ class VGG_wfc(nn.Module):
         # imgm[h,w]
         batchsize, channel, h, w = m_img.shape[0:4] #(8,3,256,256)
         # find origin
-        h0,w0 = int(h/2),int(w/2) 
-        # define 9 band
-        bandwidth = w/2/9
-        # 9 bandorigin
-        bandorigin = list()
-        for idx in range(1,10):
-            bandorigin.append((2*idx-1)/2*bandwidth)
+        h0,w0 = int(h/2),int(w/2) # 128,128
+        # define 1-9 bandwidth
+        bandwidth = int(w/2//9) # 14*9+2=256
+
+        # define 10 bandwidth
+        bandwidth_10 = int(w/2%9) # 14*9+2=256
 
         # define filter
-        filter = torch.zeros(size=(batchsize,h,w)) #(8,256,256)
-        for i in range(0,w):
-            for j in range(0,h):
-                r = math.sqrt(pow(i-w0,2)+pow(j-h0,2))
-                for band in bandorigin:
-                    if band-bandwidth/2< r <band+bandwidth/2:
-                        filter[:,i,j] = weight[:,bandorigin.index(band)]
-                        break
-                    filter[:,i,j] = weight[:,9]
-        filter = filter.unsqueeze(1) # (8,1,256,256)
-        filter = filter.expand(-1,3,-1,-1) # (8,3,256,256)
+        unfilter = []
+        for i in range(0,batchsize): # 0-7
+            subfilter = torch.zeros(bandwidth*2,bandwidth*2) #(28,28)
+            subfilter[:] = weight[i,0]
+            for j in range(1,9): # 1-9
+                m = torch.nn.ConstantPad2d(bandwidth,weight[i,j].item()) 
+                subfilter = m(subfilter) # enlarge subfilter and fill weight[i,j]
+            m_10 = torch.nn.ConstantPad2d(bandwidth_10,weight[i,9].item())
+            subfilter = m_10(subfilter) # [256,256]
+            subfilter = subfilter.unsqueeze(0) #[1,256,256]
+            subfilter = subfilter.expand(channel,-1,-1) #[3,256,256]
+            subfilter = subfilter.unsqueeze(0) #[1,3,256,256]
+            unfilter.append(subfilter)
+        filter = torch.cat(unfilter,dim=0) #[8,3,256,256]
+
         return filter
         # filter corresponds to weights, new_magnitude corresponds to complex value
 
