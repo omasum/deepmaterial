@@ -461,6 +461,7 @@ class SurfaceNetDataset(data.Dataset):
 
 @DATASET_REGISTRY.register()
 class areaDataset(svbrdfDataset):
+
     def __init__(self, opt):
         super().__init__(opt)
         self.light_mode=self.opt.get('light_mode', 'area')
@@ -504,7 +505,7 @@ class areaDataset(svbrdfDataset):
     def __getitem__(self, index):
         img_path = self.data_paths[index]
         img_bytes = self.file_client.get(img_path, 'brdf')
-        svbrdf_img = imfrombytes(img_bytes, float32=True, bgr2rgb=True)
+        svbrdf_img = imfrombytes(img_bytes, float32=True, bgr2rgb=True) # original iamges/255: 0-1
         pattern = {}
         h,w,c = svbrdf_img.shape
         # svbrdf_img = imresize(svbrdf_img, scale = 256/288) # 2080ti

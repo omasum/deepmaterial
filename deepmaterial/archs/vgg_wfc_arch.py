@@ -27,7 +27,7 @@ class VGG_wfc(nn.Module):
     def __init__(self, vgg_name='VGG19'):
         super(VGG_wfc, self).__init__()
         self.features = self._make_layers(cfg[vgg_name])
-        self.classifier = nn.Linear(512*8*8, 10)
+        self.classifier = self.Classifier(512*8*8, 10)
         self.unet = UNet(3,9)
 
     def forward(self, x):
@@ -37,6 +37,12 @@ class VGG_wfc(nn.Module):
         out = self.img_process(x,out) # image process layer, [batchsize,3,h,w]
         out = self.unet(out)
         return out
+    
+    def Classifier(self,in_chnnel,out_chnnel):
+        layers = []
+        layers += [nn.Linear(in_chnnel,out_chnnel)]
+        layers += [nn.ReLU(inplace=True)]
+        return nn.Sequential(*layers)
 
     def _make_layers(self, cfg):
         layers = []
@@ -142,19 +148,40 @@ class VGG_wfc(nn.Module):
         return img
         # img corresponds to complex value
 
+    def deprocess(self,m_img):
+        '''depreocess images fed to network(-1,1) to initial images(0,255)
+
+        Args:
+            m_img (tensor.complex[batchsize,3,h,w]): iamges fetched
+        '''
+        # (-1~1) convert to (0~1)
+        img = (m_img+1.0)/2.0
+
+        #de-log_normalization
+        img = self.de_log_normalization(img)
+
+        #(0,1) convert to (0,255)
+        img = img * 255.0
+        return img
+
+    def de_log_normalization(self,img):
+        eps=1e-2
+        image = torch.exp(img * (torch.log(1 + torch.ones((1,),device='cuda') * eps) - torch.log(torch.ones((1,),device='cuda') * eps)) + torch.log(torch.ones((1,),device='cuda') * eps))-0.01
+        return image
+
     def img_process(self,img,l_weight):
         '''filter image with wieghts learnt
 
         Args:
-            img (tensor.float[batchsize,3,h,w]): original image 
+            img (tensor.float[batchsize,3,h,w]): original input 
             l_weight (tensor.float[batchsize,10])
         Return:
             image filtered(tensor.float[batchsize,3,h,w])
         '''
-
-        new_img = torch.ones_like(img) # new batchsize image
-        filter = self.filter(img,l_weight)
-        f_img = self.fft(img)
+        image = self.deprocess(img)
+        new_img = torch.ones_like(image) # new batchsize image
+        filter = self.filter(image,l_weight)
+        f_img = self.fft(image)
         passed_img = self.passfilter(f_img,filter)
         new_img = self.dfft(passed_img)
         return new_img
