@@ -33,7 +33,7 @@ class VGG_wfc(nn.Module):
     def forward(self, x):
         out = self.features(x) #[batchsize,512,hc,wc]
         out = out.view(out.size(0), -1) # [batchsize,longcharacter]
-        out = self.classifier(out) # [batch_size,10]
+        out = self.classifier(out) # weight: [batch_size,10]
         out = self.img_process(x,out) # image process layer, [batchsize,3,h,w]
         out = self.unet(out)
         return out
@@ -41,7 +41,7 @@ class VGG_wfc(nn.Module):
     def Classifier(self,in_chnnel,out_chnnel):
         layers = []
         layers += [nn.Linear(in_chnnel,out_chnnel)]
-        layers += [nn.ReLU(inplace=True)]
+        layers += [nn.Sigmoid()] # output weight must in (0,1)
         return nn.Sequential(*layers)
 
     def _make_layers(self, cfg):
@@ -152,7 +152,7 @@ class VGG_wfc(nn.Module):
         '''depreocess images fed to network(-1,1) to initial images(0,255)
 
         Args:
-            m_img (tensor.complex[batchsize,3,h,w]): iamges fetched
+            m_img (tensor.complex[batchsize,3,h,w]): images fetched
         '''
         # (-1~1) convert to (0~1)
         img = (m_img+1.0)/2.0
@@ -163,11 +163,25 @@ class VGG_wfc(nn.Module):
         #(0,1) convert to (0,255)
         img = img * 255.0
         return img
+    
+    def reprocess(self,m_img):
+        '''process image filtered(0,255) to feed network(-1,1)
+
+        Args:
+            m_img (tensor.complex[batchsize,3,h,w]): images filtered
+        '''
+        img = m_img / 255.0 #(0,1)
+        img = 2.0 * img - 1.0 #(-1,1)
+        return img
 
     def de_log_normalization(self,img):
         eps=1e-2
         image = torch.exp(img * (torch.log(1 + torch.ones((1,),device='cuda') * eps) - torch.log(torch.ones((1,),device='cuda') * eps)) + torch.log(torch.ones((1,),device='cuda') * eps))-0.01
         return image
+    
+    def log_normalization(self,img):
+        eps = 1e-2
+        return (torch.log(img + eps) - torch.log(torch.ones((1,),device='cuda') * eps)) / (torch.log(1 + torch.ones((1,),device='cuda') * eps) - torch.log(torch.ones((1,),device='cuda') * eps))
 
     def img_process(self,img,l_weight):
         '''filter image with wieghts learnt
@@ -179,11 +193,15 @@ class VGG_wfc(nn.Module):
             image filtered(tensor.float[batchsize,3,h,w])
         '''
         image = self.deprocess(img)
+
         new_img = torch.ones_like(image) # new batchsize image
         filter = self.filter(image,l_weight)
         f_img = self.fft(image)
         passed_img = self.passfilter(f_img,filter)
         new_img = self.dfft(passed_img)
+
+        new_img = self.reprocess(new_img)
+
         return new_img
 
 def test():
