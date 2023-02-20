@@ -74,7 +74,7 @@ class OutConv(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=1),
             nn.BatchNorm2d(out_channels),
-            nn.Sigmoid()
+            nn.Tanh()
         )
         # self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
 
