@@ -19,6 +19,17 @@
             ]
         },
         {
+            "name": "test_vmsf",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-opt",
+                "options/test/VW/test_vwsf.yml"
+            ]
+        },
+        {
             "name": "msan_test",
             "type": "python",
             "request": "launch",
