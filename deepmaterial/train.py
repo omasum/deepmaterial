@@ -12,7 +12,7 @@ import setproctitle
 
 from deepmaterial.utils.misc import cp_options
 
-proc_title = "ZLHTrain"
+proc_title = "CJMTrain"
 setproctitle.setproctitle(proc_title)
 torch.backends.cudnn.benchmark = False
 # print(f"there is {torch.cuda.device_count()} available gpu device")

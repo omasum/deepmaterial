@@ -4,6 +4,7 @@
     // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         
     
         {
@@ -69,7 +70,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-opt",
-                "options/train/VW/train_vw.yml"
+                "options/train/VW/train_vwsf.yml"
             ]
         },
         {
