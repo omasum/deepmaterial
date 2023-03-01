@@ -149,13 +149,13 @@ class VW_testModel(SurfaceNetModel):
         # add filters
         nfilter, dfilter, rfilter, sfilter = torch.split( filter, 3, dim=1)
         filters = torch.cat([nfilter, dfilter, rfilter, sfilter], dim=-1) # (batchsize, 3, 256, 256*4)
-        output = torch.cat(output, filters, dim = 2) # (batchsize, 3, 256*3, 256*4)
+        output = torch.cat([output, filters], dim = 2) # (batchsize, 3, 256*3, 256*4)
         # add a black image
         black = torch.zeros(1,3,256,256)
         
-        renderer, gtrender = self.eval_render(pred, gt)
+        renderer, gtrender = self.eval_render(pred, gt) # [1,3,256,256]
         render = torch.split(torch.cat([gtrender,renderer],dim=-2),[1]*self.renderer.nbRendering, dim=-4)
-        render = torch.cat(render, dim=-1).squeeze(1)
+        render = torch.cat(render, dim=-1).squeeze(1) # [1,3,256*2,256]
 
         output = torch.cat([torch.cat([render**0.4545,black],dim=2), output], dim=-1) # (batchsize, 3, 256*3, 256*5)
 
