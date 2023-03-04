@@ -65,9 +65,9 @@ network_g:
 #   type: PatchDiscriminator
 # path
 path:
-  # pretrain_network_g: ~
-  strict_load_g: false
-  # resume_state: experiments/001_SurfaceNet/training_states/609.state
+  pretrain_network_g: ~
+  strict_load_g: True
+  resume_state: experiments/001_VW/training_states/250000.state
 
 # training settings
 train:
@@ -80,7 +80,7 @@ train:
     type: MultiStepRestartLR
     milestones: [600000, 600000]
     # milestones: [1,5,10,15]
-  total_iter: 250000
+  total_iter: 400000
   warmup_iter: -1  # no warm up
 
   # losses
