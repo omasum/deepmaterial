@@ -85,6 +85,17 @@
             ]
         },
         {
+            "name": "wavelet_train",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-opt",
+                "options/train/VW/train_wavelet.yml"
+            ]
+        },
+        {
             "name": "radn_test",
             "type": "python",
             "request": "launch",

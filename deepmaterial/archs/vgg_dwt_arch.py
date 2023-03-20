@@ -18,7 +18,7 @@ cfg = {
 }
 
 @ARCH_REGISTRY.register()
-class VGG_wfc_sf(nn.Module):
+class VGG_dwt_sf(nn.Module):
     '''VGG network for image classification.
     for each image, output 10 numbers range [0,1]
 
@@ -26,9 +26,9 @@ class VGG_wfc_sf(nn.Module):
         vgg_name (string): Set the type of vgg network. Default: 'vgg19'.
     '''
     def __init__(self, vgg_name='VGG19'):
-        super(VGG_wfc_sf, self).__init__()
+        super(VGG_dwt_sf, self).__init__()
         self.features = self._make_layers(cfg[vgg_name])
-        self.classifier = self.Classifier(512*8*8, 40)
+        self.classifier = self.Classifier(512*8*8, 16)
         self.unetn = UNet(3,2)
         self.unetd = UNet(3,3)
         self.unetr = UNet(3,1)
@@ -67,88 +67,90 @@ class VGG_wfc_sf(nn.Module):
         layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
         return nn.Sequential(*layers)
 
-    def fft(self,img):
-        '''fourier transform of image
+    def dwt(self,img):
+        '''Haar DWT of image
 
         Args:
             img (tensor.float[batchsize,3,h,w]): original images
 
         Returns:
-            fshift_img(tensor.complex[batchsize,3,h,w]): images after fourier transform
+            dwt_img(tensor.float[batchsize,c*4,h/2,w/2]):return cat of 4 feature maps
         '''
-       # fourier transform
-        f_img = torch.fft.fft2(img) # complex64[batchsize,3,h,w]
-        # shift
-        fshift_img = torch.fft.fftshift(f_img)
-        t_magnitude = 20*torch.log(torch.abs(fshift_img))
-        # 转为numpy array
-        # magnitude = t_magnitude.numpy()
-        return fshift_img
+     
+        x01 = img[:, :, 0::2, :] / 2 # odd row
+        x02 = img[:, :, 1::2, :] / 2 # even row
+        x1 = x01[:, :, :, 0::2] # odd row, odd column
+        x2 = x02[:, :, :, 0::2] # even row, odd column
+        x3 = x01[:, :, :, 1::2] # odd row, even column
+        x4 = x02[:, :, :, 1::2] # even row, even column
+        x_LL = x1 + x2 + x3 + x4 # height/2, width/2
+        x_HL = -x1 - x2 + x3 + x4
+        x_LH = -x1 + x2 - x3 + x4
+        x_HH = x1 - x2 - x3 + x4
 
-    def dfft(self,m_img):
-        '''dfft of passfiltered images
+        return torch.cat((x_LL, x_HL, x_LH, x_HH), 1)
+
+    def idwt(self,m_img):
+        ''' Haar iDWT of features
 
         Args:
-            m_img (tensor.complex[batchsize,3,h,w]): frequency domain images
+            m_img (tensor.float[batchsize,c*4,h/2,w/2]): wavelet features
 
         Returns:
             iimg(tensor.float[batchsize,3,h,w]): images
         '''
-        ishift = torch.fft.ifftshift(m_img)
-        ifft = torch.fft.ifft2(ishift)
-        iimg = torch.abs(ifft)
-        # iimg = iimg.numpy()
-        return iimg
+        r = 2
+        in_batch, in_channel, in_height, in_width = m_img.size()
+        #print([in_batch, in_channel, in_height, in_width])
+        out_batch, out_channel, out_height, out_width = in_batch, int(
+            in_channel / (r ** 2)), r * in_height, r * in_width
+        x1 = m_img[:, 0:out_channel, :, :] / 2
+        x2 = m_img[:, out_channel:out_channel * 2, :, :] / 2
+        x3 = m_img[:, out_channel * 2:out_channel * 3, :, :] / 2
+        x4 = m_img[:, out_channel * 3:out_channel * 4, :, :] / 2
+        
 
-    # filter: 10 weights of solid frequency stage
-    def filter(self,m_img,weight):
+        # h = torch.zeros([out_batch, out_channel, out_height, out_width]).float().cuda()
+        h = torch.zeros([out_batch, out_channel, out_height, out_width]).float()
+
+        h[:, :, 0::2, 0::2] = x1 - x2 - x3 + x4
+        h[:, :, 1::2, 0::2] = x1 - x2 + x3 - x4
+        h[:, :, 0::2, 1::2] = x1 + x2 - x3 - x4
+        h[:, :, 1::2, 1::2] = x1 + x2 + x3 + x4
+
+        return h
+
+    def Filter(self,m_img,weight):
         '''build filter using weight
 
         Args:
-            m_img (tensor.float[batchsize,3,h,w]): original image, support shape for filter
-            weight (tensor.float[batchsize,10]): output of classify layers, 3 channels of an image share the same weights however each image has different weights
+            m_img (tensor.float[batchsize,c*4,h/2,w/2]): image after dwt, support shape for filter
+            weight (tensor.float[batchsize,4]): output of classify layers, 3 channels of an image share the same weights while each image has different weights
 
         Returns:
-            tensor.float[batchsize,3,h,w]: filter
+            tensor.float[batchsize,c*4,h/2,w/2]: filter
         '''
-        # imgm[h,w]
-        batchsize, channel, h, w = m_img.shape[0:4] #(8,3,256,256)
-        # find origin
-        h0,w0 = int(h/2),int(w/2) # 128,128
-        # define 1-9 bandwidth
-        bandwidth = int(w/2//9) # 14*9+2=256
-
-        # define 10 bandwidth
-        bandwidth_10 = int(w/2%9) # 14*9+2=256
-
-        # define filter
-        unfilter = []
-        for i in range(0,batchsize): # 0-7
-            subfilter = torch.zeros(bandwidth*2,bandwidth*2) #(28,28)
-            subfilter[:] = weight[i,0]
-            for j in range(1,9): # 1-9
-                m = torch.nn.ConstantPad2d(bandwidth,weight[i,j].item()) 
-                subfilter = m(subfilter) # enlarge subfilter and fill weight[i,j]
-            m_10 = torch.nn.ConstantPad2d(bandwidth_10,weight[i,9].item())
-            subfilter = m_10(subfilter) # [256,256]
-            subfilter = subfilter.unsqueeze(0) #[1,256,256]
-            subfilter = subfilter.expand(channel,-1,-1) #[3,256,256]
-            subfilter = subfilter.unsqueeze(0) #[1,3,256,256]
-            unfilter.append(subfilter)
-        filter = torch.cat(unfilter,dim=0) #[8,3,256,256]
-
+        batchsize, channels, h, w = m_img.shape[0:4] #(8,3*4,256/2,256/2)
+        channel = int(channels/4)
+        weight = weight.unsqueeze(-1)
+        weight = weight.unsqueeze(-1) # [batchsize,4,1,1]
+        llw, hlw, lhw, hhw = weight.split(1, dim=1) # tuple of [batchsize,1,1,1]
+        ll_weight = llw.expand(-1, channel, h, w)
+        hl_weight = hlw.expand(-1, channel, h, w)
+        lh_weight = lhw.expand(-1, channel, h, w)
+        hh_weight = hhw.expand(-1, channel, h, w)
+        filter = torch.cat([ll_weight, hl_weight, lh_weight, hh_weight], dim = 1)
         return filter
-        # filter corresponds to weights, new_magnitude corresponds to complex value
 
         # passfilter of images(R,G,B repectively)
     def passfilter(self,m_img,filter):
         '''passfilter for frequency domain image
 
         Args:
-            m_img (tensor.complex[batchsize,3,h,w]): after fft image
-            filter (tensor.float[batchsize,3,h,w]): filter
+            m_img (tensor.float[batchsize, 4*3, h/2, w/2]): after dwt image
+            filter (tensor.float[batchsize, 4*3, h/2, w/2]): filter for LL, HL, LH, HH features
         Returns:
-            tensor.complex[batchsize,3,h,w]: new image
+            tensor.float[batchsize,4*3,h/2,w/2]: new wavelet features of each svbrdf maps
         '''
         filter = filter.to('cuda')
 
@@ -197,26 +199,27 @@ class VGG_wfc_sf(nn.Module):
 
         Args:
             img (tensor.float[batchsize,3,h,w]): original input 
-            l_weight (tensor.float[batchsize,40])
+            l_weight (tensor.float[batchsize,4*4])
         Return:
-            image filtered(tensor.float[batchsize,12,h,w]): sequence [n,d,r,s]
+            image filtered(tensor.float[batchsize,4*4*3,h,w]): sequence [n,d,r,s]
         '''
         image = self.deprocess(img)
-        weight = torch.split(l_weight,10,dim=1) # tensors in tuple with sequence (n,d,r,s)
+        weight = torch.split(l_weight,4,dim=1) # tensors in tuple with sequence (n,d,r,s)
 
         consolidate = []
         new_img = torch.ones_like(image) # new batchsize image
         
         for w in weight:
-            filter = self.filter(image,w)
-            f_img = self.fft(image)
+            f_img = self.dwt(image)
+            filter = self.Filter(f_img,w)
             passed_img = self.passfilter(f_img,filter)
-            new_img = self.dfft(passed_img)
+            new_img = self.idwt(passed_img)
 
             new_img = self.reprocess(new_img)
             consolidate.append(new_img) # filtered image[n,d,r,s],[4tenror(batchsize,3,h,w)]
         
         result = torch.cat(consolidate,dim=1)
+        result = result.to('cuda')
         return result # filtered image[batchsize,12,h,w]
     
     def visualization(self,filter):
@@ -229,7 +232,7 @@ class VGG_wfc_sf(nn.Module):
         pass
 
 def test():
-    net = VGG_wfc_sf('VGG11')
+    net = VGG_dwt_sf('VGG11')
     x = torch.randn(2,3,32,32)
     y = net(x)
     print(y.size())

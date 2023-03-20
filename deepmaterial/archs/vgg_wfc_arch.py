@@ -1,4 +1,5 @@
 '''VGG11/13/16/19 in Pytorch.'''
+# add learned fourier filter to get 4 maps together
 import os
 import torch
 import numpy as np
