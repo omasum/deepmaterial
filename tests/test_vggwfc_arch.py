@@ -1,6 +1,7 @@
 from torchsummary import summary
-from deepmaterial.archs.vgg_dwt_arch import VGG_dwt_sf
+from deepmaterial.archs.wfc_sf_arch import wfc_sf_arch
 
-myNet = VGG_dwt_sf('VGG11')
+myNet = wfc_sf_arch('VGG11')
 myNet = myNet.to('cuda')
 summary(myNet,(3,256,256),8)
+

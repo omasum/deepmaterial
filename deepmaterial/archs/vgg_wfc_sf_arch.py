@@ -98,6 +98,7 @@ class VGG_wfc_sf(nn.Module):
         ifft = torch.fft.ifft2(ishift)
         iimg = torch.abs(ifft)
         # iimg = iimg.numpy()
+        iimg = torch.clip(iimg, min=0.0, max=255.0)
         return iimg
 
     # filter: 10 weights of solid frequency stage

@@ -80,7 +80,7 @@ class VGG_wfc_sf_test(nn.Module):
         f_img = torch.fft.fft2(img) # complex64[batchsize,3,h,w]
         # shift
         fshift_img = torch.fft.fftshift(f_img)
-        t_magnitude = 20*torch.log(torch.abs(fshift_img))
+        t_magnitude = 20 * torch.log(torch.abs(fshift_img))
         # 转为numpy array
         # magnitude = t_magnitude.numpy()
         return fshift_img
@@ -98,6 +98,7 @@ class VGG_wfc_sf_test(nn.Module):
         ifft = torch.fft.ifft2(ishift)
         iimg = torch.abs(ifft)
         # iimg = iimg.numpy()
+        iimg = torch.clip(iimg, min=0.0, max=255.0)
         return iimg
 
     # filter: 10 weights of solid frequency stage

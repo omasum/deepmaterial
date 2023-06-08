@@ -18,7 +18,7 @@ cfg = {
 }
 
 @ARCH_REGISTRY.register()
-class VGG_dwt_sf(nn.Module):
+class VGG_dwt_test_sf(nn.Module):
     '''VGG network for image classification.
     for each image, output 10 numbers range [0,1]
 
@@ -26,7 +26,7 @@ class VGG_dwt_sf(nn.Module):
         vgg_name (string): Set the type of vgg network. Default: 'vgg19'.
     '''
     def __init__(self, vgg_name='VGG19'):
-        super(VGG_dwt_sf, self).__init__()
+        super(VGG_dwt_test_sf, self).__init__()
         self.features = self._make_layers(cfg[vgg_name])
         self.classifier = self.Classifier(512*8*8, 16)
         self.unetn = UNet(3,2)
@@ -38,14 +38,14 @@ class VGG_dwt_sf(nn.Module):
         out = self.features(x) #[batchsize,512,hc,wc]
         out = out.view(out.size(0), -1) # [batchsize,longcharacter]
         out = self.classifier(out) # weight: [batch_size,40]
-        out = self.img_process(x,out) # image process layer, [batchsize,12,h,w]
+        out, filters = self.img_process(x,out) # image process layer, [batchsize,12,h,w]
         outn = self.unetn(out[:,0:3]) # [batchsize,2,h,w]
         outd = self.unetd(out[:,3:6]) # [batchsize,3,h,w]
         outr = self.unetr(out[:,6:9]) # [batchsize,1,h,w]
         outs = self.unets(out[:,9:12]) # [batchsize,3,h,w]
         out = torch.cat([outn,outd,outr,outs],dim=1) # [batchsize,9,h,w]
 
-        return out
+        return out, filters
     
     def Classifier(self,in_chnnel,out_chnnel):
         layers = []
@@ -202,13 +202,15 @@ class VGG_dwt_sf(nn.Module):
             l_weight (tensor.float[batchsize,4*4])
         Return:
             image filtered(tensor.float[batchsize,4*3,h,w]): sequence [n,d,r,s]
+            filter(tensor.float[batchsize,4*3,h,w]): sequence [n,d,r,s]
         '''
         image = self.deprocess(img)
         weight = torch.split(l_weight,4,dim=1) # tensors in tuple with sequence (n,d,r,s)
 
         consolidate = []
         new_img = torch.ones_like(image) # new batchsize image
-        
+        filters = []
+
         for w in weight:
             f_img = self.dwt(image)
             filter = self.Filter(f_img,w)
@@ -217,10 +219,18 @@ class VGG_dwt_sf(nn.Module):
 
             new_img = self.reprocess(new_img)
             consolidate.append(new_img) # filtered image[n,d,r,s],[4tenror(batchsize,3,h,w)]
+
+            # visualize filters
+            llf,hlf,lhf,hhf = torch.split(filter,3,dim=1)
+            new_filter1 = torch.cat([llf,hlf], dim = -1)
+            new_filter2 = torch.cat([lhf,hhf], dim = -1)
+            new_filter = torch.cat([new_filter1,new_filter2], dim = 2) # tensor[batchsize,3,h,w]
+            filters.append(new_filter)
         
         result = torch.cat(consolidate,dim=1)
         result = result.to('cuda')
-        return result # filtered image[batchsize,12,h,w]
+        filters = torch.cat(filters,dim=1)
+        return result, filters # filtered image[batchsize,12,h,w], filters[batchsize,4*3,h,w]
     
     def visualization(self,filter):
         '''save filter
@@ -232,7 +242,7 @@ class VGG_dwt_sf(nn.Module):
         pass
 
 def test():
-    net = VGG_dwt_sf('VGG11')
+    net = VGG_dwt_test_sf('VGG11')
     x = torch.randn(2,3,32,32)
     y = net(x)
     print(y.size())

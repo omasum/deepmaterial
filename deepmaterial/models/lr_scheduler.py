@@ -30,7 +30,8 @@ class MultiStepRestartLR(_LRScheduler):
             return [group['initial_lr'] * weight for group in self.optimizer.param_groups]
         if self.last_epoch not in self.milestones:
             return [group['lr'] for group in self.optimizer.param_groups]
-        return [group['lr'] * self.gamma**self.milestones[self.last_epoch] for group in self.optimizer.param_groups]
+        # return [group['lr'] * self.gamma**self.milestones[self.last_epoch] for group in self.optimizer.param_groups]
+        return [group['lr'] * self.gamma for group in self.optimizer.param_groups]
 
 
 def get_position_from_periods(iteration, cumulative_period):

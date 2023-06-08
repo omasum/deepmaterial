@@ -29,6 +29,7 @@
                 "options/test/VW/test_vwsf.yml"
             ]
         },
+        
         {
             "name": "msan_test",
             "type": "python",
@@ -85,6 +86,17 @@
             ]
         },
         {
+            "name": "train_fd",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-opt",
+                "options/train/FD/train_fd.yml"
+            ]
+        },
+        {
             "name": "wavelet_train",
             "type": "python",
             "request": "launch",
@@ -93,6 +105,17 @@
             "args": [
                 "-opt",
                 "options/train/VW/train_wavelet.yml"
+            ]
+        },
+        {
+            "name": "wfc_train",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-opt",
+                "options/train/VW/train_wsf.yml"
             ]
         },
         {

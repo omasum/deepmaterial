@@ -1,7 +1,7 @@
 # general settings
-name: '001_VW'  # initialization
+name: '001_mwcnn'  # initialization
 
-model_type: VWModel
+model_type: MWCNNModel
 num_gpu: 1  # set num_gpu: 0 for cpu mode
 manual_seed: 10
 
@@ -52,34 +52,38 @@ datasets:
 
 # network structures
 network_g:
-  type: VGG_wfc_sf
+  type: MWCNN
   brdf_args:
     nbRendering: 1
     size: 256
     order: pndrs
     toLDR: True
     lampIntensity: 12
-  vgg_name: 'VGG11'
+  n_feats: 64
+  n_colors: 3
+  target_colors: 9
 
 # network_d:
 #   type: PatchDiscriminator
 # path
+
 path:
-  # pretrain_network_g: ~
-  strict_load_g: False
-  # resume_state: experiments/001_VW/training_states/250000.state
+#   pretrain_network_g: ~
+   strict_load_g: False
+#   resume_state: experiments/001_VW/training_states/250000.state
 
 # training settings
 train:
   optim_g:
     type: Adam
-    lr: !!float 2e-5
+    lr: !!float 1.024e-4
     weight_decay: 0
-    betas: [0.5, 0.999]
+    betas: [0.9, 0.999]
   scheduler:
     type: MultiStepRestartLR
-    milestones: [600000, 600000]
-    # milestones: [1,5,10,15]
+    # milestones: [600000, 600000]
+    milestones: [8,15]
+    gamma: 0.5
   total_iter: 400000
   warmup_iter: -1  # no warm up
 
@@ -108,6 +112,6 @@ val:
 
 # logging settings
 logger:
-  print_freq: 1000
+  print_freq: 100
   save_checkpoint_freq: !!float 5e4
   use_tb_logger: true

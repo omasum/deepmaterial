@@ -550,8 +550,8 @@ class areaDataset(svbrdfDataset):
             inputs = log_normalization(inputs)
         inputs = preprocess(inputs)
         result = {
-            'inputs': inputs,
-            'imgs': inputs_img,
+            'inputs': inputs, # input of net
+            'imgs': inputs_img, # show
             'svbrdfs': svbrdfs,
             'name': os.path.basename(img_path)
         }
