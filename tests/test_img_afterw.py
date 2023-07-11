@@ -4,12 +4,17 @@ import os
 from deepmaterial.archs.vgg_wfc_sf_test_arch import VGG_wfc_sf_test
 import torch
 
-path = "results/001_RADN_archived_20230405_180124/visualization/areaDataset/svbrdf-001_RADN-48.png"
+original_path = "/home/sda/svBRDFs/testBlended/0000002;PolishedMarbleFloor_01Xmetal_bumpy_squares;3Xdefault.png"
+path = "results/001_RADN_archived_20230612_152326/visualization/areaDataset/svbrdf-001_RADN-1.png"
 target = "tests/Fimg_001_RADN_archived_20230405_180124"
 
 allimg = cv2.imread(path)
 allimg = cv2.cvtColor(allimg, cv2.COLOR_BGR2RGB)
 [original, pred, filter] = np.split(allimg,indices_or_sections=3, axis=0)
+
+original1 = cv2.imread(original_path)
+original = cv2.cvtColor(original1, cv2.COLOR_BGR2RGB)
+
 input = np.split(original, 5, axis=1)[0]
 input = torch.tensor(input.transpose(2, 0, 1)) #torch.tensor(3,256,256)
 filters = np.split(filter/255.0, 5, axis=1) # [black, filtern, filterd, filterr, filters]

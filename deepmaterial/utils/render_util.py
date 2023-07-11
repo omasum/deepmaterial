@@ -14,7 +14,8 @@ from deepmaterial.utils.wrapper_util import timmer
 import nvdiffrast.torch as dr
 
 lightDistance = 2.14
-viewDistance = 2.75  # 39.98 degrees FOV
+viewDistance = 5  # 44 degrees FOV 
+
 
 class BRDF(metaclass=ABCMeta):
     '''
@@ -285,10 +286,10 @@ class PlanarSVBRDF(BRDF):
         """Split input image to $split_num images.
 
         Args:
-            imgs (list[ndarray] | ndarray): Images with shape (h, w, c).
+            imgs (list[ndarray] | ndarray): Images with shape (h, w, c). range(0,1)
             split_num (int): number of input images containing
             split_axis (int): which axis the split images is concated.
-
+            svbrdf_norm(bool): if True, process numpy array from (0,1) to (-1,1), and may do gamma_correct
         Returns:
             list[ndarray]: Split images.
         """
@@ -549,6 +550,7 @@ class PlanarSVBRDF(BRDF):
         if importantSampling:
             pdf = D * NoH / 4.0 / VoH
             return res, pdf, l, h
+        res = torch.clip(res, 0.0, 1.0)
         return res
 
     def to(self, device):
@@ -570,6 +572,10 @@ class Render():
     def render(self, svbrdf, single_pos=False, obj_pos=None, light_pos=None, view_pos=None, keep_dirs=False, load_dirs=False, light_dir=None,
                view_dir=None, light_dis=None, surface=None, random_light=True, colocated=False, lossRender=False,
                n_xy=False, r_single=True, toLDR=None, useDiff=True, perPoint=False, isAmbient=False):
+        '''
+        Args:
+            light_dir(tensor[3]):[x,y,z](tensor.float32): parallel light direction
+        '''
         assert not (light_dir is not None and light_pos is not None), (
             'Given two type of lighting initilization, please choose one type (light_dir, light_pos)')
         assert not (view_dir is not None and view_pos is not None), (
@@ -581,6 +587,7 @@ class Render():
         if toLDR is None:
             toLDR = self.opt['toLDR']
         if light_dir is None:
+            # pointlight set
             if random_light:
                 light_pos = self.lighting.fullRandomLightsSurface()
             elif light_pos is not None:
@@ -598,6 +605,18 @@ class Render():
                 obj_pos = torch.rand((self.nbRendering, 3), dtype=torch.float32) * 2 - 1
                 obj_pos[:, 2] = 0.0
             light_dir, view_dir, light_dis, surface = self.torch_generate(view_pos, light_pos, pos=obj_pos)
+        else:
+            # parallel light set
+            light_dir = light_dir.unsqueeze(0).unsqueeze(2).unsqueeze(3)
+            light_dir = light_dir.repeat(1, 1 ,self.opt['size'], self.opt['size'])
+            if colocated:
+                view_pos = light_pos
+            elif view_pos is not None:
+                view_pos = torch.from_numpy(np.array(view_pos)).view(1, 3)
+            else:
+                view_pos = self.camera.fixedView() # the center of material plane
+            light_dir, view_dir, light_dis, surface = self.torch_generate_parallel(view_pos, light_dir, pos=obj_pos)
+    
         if keep_dirs:
             self.light_dir = light_dir
             self.view_dir = view_dir
@@ -666,8 +685,11 @@ class Render():
         return self.light_dir, self.view_dir, self.light_dis, self.surface
 
     def torch_generate(self, camera_pos_world, light_pos_world, surface=None, pos=None, normLight=True):
+        '''
+            return light_dir_world.shape=[nbRendering,3,size,size]
+        '''
         # permute = self.opt['permute_channel']
-        size = self.opt['size']
+        size = self.opt['size'] #256
         nl, _ = light_pos_world.shape[-2:]
         nv, _ = camera_pos_world.shape[-2:]
         if pos is None and surface is None:
@@ -684,11 +706,35 @@ class Render():
 
         # pos = torch.tile(pos,[n,1,1,1])
         light_dis_square = torch.sum(torch.square(light_pos_world - pos), -3, keepdims=True)
+        # [n,1,256,256]
 
         if normLight:
             light_dir_world = torch_norm(light_pos_world - pos, dim=-3)
         else:
             light_dir_world = light_pos_world-pos
+
+        return light_dir_world, view_dir_world, light_dis_square, pos
+
+    def torch_generate_parallel(self, camera_pos_world, light_dir, surface=None, pos=None, normLight=True):
+        
+        # permute = self.opt['permute_channel']
+        size = self.opt['size'] #256
+        nv, _ = camera_pos_world.shape[-2:]
+        if pos is None and surface is None:
+            pos = self.generate_surface(size)
+        elif surface is not None:
+            pos = surface
+        else:
+            pos.unsqueeze_(-1).unsqueeze_(-1)
+
+        if normLight:
+            light_dir_world = torch_norm(light_dir, dim=-3)
+
+        camera_pos_world = camera_pos_world.view(*camera_pos_world.shape, 1, 1)
+        view_dir_world = torch_norm(camera_pos_world - pos, dim=-3)
+
+        # pos = torch.tile(pos,[n,1,1,1])
+        light_dis_square = torch.ones(self.opt['nbRendering'], 1, size, size)
 
         return light_dir_world, view_dir_world, light_dis_square, pos
 
@@ -965,10 +1011,13 @@ class Lighting:
         return currentLightPos.float()
 
     def fixedLightsSurface(self):
+        '''
+            generate pointlight with position[0, 0, lightDistance], the shape is [nbRenderings, 3]
+        '''
         nbRenderings = self.nbRendering
         currentLightPos = torch.from_numpy(np.array([0.0, 0.0, lightDistance])).view(1, 3)
         currentLightPos = torch.cat([currentLightPos] * nbRenderings, dim=0)
-        # [n, 3]
+        # [nbRenderings, 3]
         return currentLightPos.float()
 
 class Ray:
@@ -1365,16 +1414,15 @@ if __name__ == "__main__":
     brdfArgs['size'] = 256
     brdfArgs['order'] = 'pndrs'
     brdfArgs['toLDR'] = False
-    brdfArgs['lampIntensity'] = 3
-
+    brdfArgs['lampIntensity'] = 1
     import torchvision
     if True:
-        path = '/home/sda/svBRDFs/testBlended/0000005;PolishedMarbleFloor_01Xmetal_bumpy_squares;0Xdefault.png'
+        path = '/home/sda/svBRDFs/testBlended/0000005;PolishedMarbleFloor_01Xmetal_bumpy_squares;0Xdefault.png' # [256, 256*5]indrs
         # path = '/home/sda/svBRDFs/testBlended/0000033;brick_uneven_stonesXPolishedMarbleFloor_01;2Xdefault.png'
         # path = '/home/sda/svBRDFs/testBlended/0000040;brick_uneven_stonesXleather_tiles;2X0.png'
         svbrdf = PlanarSVBRDF(brdfArgs)
-        img = cv.imread(path)[:, :, ::-1] / 255
-        svbrdf.get_svbrdfs(img)
+        img = cv.imread(path)[:, :, ::-1] / 255.0
+        svbrdf.get_svbrdfs(img) # change svbrdf.brdf
         # svbrdf.brdf[:3,:,:] = torch.stack([torch.zeros_like(svbrdf.brdf[0,:,:]),torch.zeros_like(svbrdf.brdf[0,:,:]),torch.ones_like(svbrdf.brdf[0,:,:])])
         # svbrdf.brdf[3:6,:,:] = torch.ones_like(svbrdf.brdf[0:1,:,:])*(-0.0)
         # svbrdf.brdf[6:7,:,:] = torch.ones_like(svbrdf.brdf[0:1,:,:])*(-0.8)
@@ -1389,22 +1437,30 @@ if __name__ == "__main__":
             torchvision.utils.save_image(
                 res**0.4545, f'tmp/test-point.png', nrow=1, padding=1, normalize=False)
         if True:
+            #======================Parallel Rendering test============================
+            renderer = Render(brdfArgs)
+            start = time.time()
+            res = renderer.render(svbrdf, random_light=False, light_dir = torch.tensor([0, 0.3, 1]))
+            print('point rendering:', time.time()-start)
+            torchvision.utils.save_image(
+                res**0.4545, f'tmp/test-parallel.png', nrow=1, padding=1, normalize=False)
+        if False:
             #============================ Polygonal Rendering test=======================
             # texture = cv.imread('tmp/0.png')/255
-            # brdfArgs['texture'] = 'tmp/0.png'
+            brdfArgs['texture'] = 'tmp/0-big.png'
             brdfArgs['textureMode'] = 'Torch'
-            brdfArgs['fetchMode'] = 'NvDiff'
+            brdfArgs['fetchMode'] = 'Torch'
             brdfArgs['nLod'] = 10
             # brdfArgs['texture'] = texture
-            # rect = RectLighting(brdfArgs, [0, -1.1, 1.0], [1, 0, 0], [0, 0, 1], 1.0, 1.0)
-            rect = RectLighting(brdfArgs, [0, 0.0, viewDistance], [1, 0, 0], [0, 1, 0], 2.0, 2.0, device='cuda')
+            # rect = RectLighting(brdfArgs, [0, -1.1, 1.0], [1, 0, 0], [0, 0, 1], 1.0, 1.0) 1-4.18/2
+            rect = RectLighting(brdfArgs, [1-4.18/2, 0.0, viewDistance], [1, 0, 0], [0, 1, 0], 2.91/2, 2.91/2, device='cpu')
             rect.initGaussianConv()
-            renderer = PolyRender(brdfArgs, lighting=rect, device='cuda')
-            pattern = torch.load('/home/sda/klkjjhjkhjhg/DeepMaterial/experiments/Exp_0005(1)_MSAN_OptimizePattern/models/pattern_550000.pth', 'cuda').unsqueeze(0)
+            renderer = PolyRender(brdfArgs, lighting=rect, device='cpu')
+            # pattern = torch.load('/home/sda/klkjjhjkhjhg/DeepMaterial/experiments/Exp_0005(1)_MSAN_OptimizePattern/models/pattern_550000.pth', 'cuda').unsqueeze(0)
             # sig_pattern = (pattern - pattern.min())/(pattern.max() - pattern.min())
-            sig_pattern = torch.sigmoid(pattern)
-            rect.initTexture(sig_pattern, 'Torch')
-            svbrdf.to('cuda')
+            # sig_pattern = torch.sigmoid(pattern)
+            # rect.initTexture(sig_pattern, 'Torch')
+            # svbrdf.to('cuda')
             start = time.time()
             res = renderer.render(svbrdf=svbrdf)
             # loss = res.mean()

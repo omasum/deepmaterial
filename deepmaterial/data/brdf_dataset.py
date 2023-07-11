@@ -492,6 +492,9 @@ class areaDataset(svbrdfDataset):
                     self.renderer = PolyRender(self.opt['brdf_args'], lighting=self.lighting)
                     lh, lw = self.renderer.lighting.tex.shape[-2:]
                     self.texture = imresize(self.renderer.lighting.tex,scale=256/lh)
+        
+            elif self.light_mode == 'parallel':
+                self.renderer = Render(self.opt['brdf_args'])
         elif self.input_mode == 'folder':
             if self.opt['phase'] == 'train':
                 input_folder = os.path.join(rendering_folder, 'train-'+self.light_mode+'Lighting-large')
@@ -540,8 +543,12 @@ class areaDataset(svbrdfDataset):
                         inputs = torch.cat([inputs, self.texture], dim=-3)
                     pattern['pattern'] = self.renderer.lighting.tex*2-1
             else:
-                inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False)
-                inputs_img = inputs ** 0.4545
+                if self.light_mode == 'point':
+                    inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False)
+                    inputs_img = inputs ** 0.4545
+                else:
+                    inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False, light_dir = torch.tensor([0, 0.3, 1]))
+                    inputs_img = inputs ** 0.4545
                 
         if not self.opt.get('gamma', True):
             inputs = inputs ** 0.4545

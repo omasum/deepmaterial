@@ -64,6 +64,7 @@ def img2tensor(imgs, bgr2rgb=True, float32=True, normalization=False, singleChan
         imgs (list[ndarray] | ndarray): Input images.
         bgr2rgb (bool): Whether to change bgr to rgb.
         float32 (bool): Whether to change to float32.
+        normalization (bool): whether /255.0
 
     Returns:
         list[tensor] | tensor: Tensor images. If returned results only have

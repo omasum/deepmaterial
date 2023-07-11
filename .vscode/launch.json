@@ -71,7 +71,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-opt",
-                "options/train/RADN/train_radn.yml"
+                "options/train/RADN/train_radn_parallel.yml"
             ]
         },
         {
@@ -119,6 +119,17 @@
             ]
         },
         {
+            "name": "wfc_test",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-opt",
+                "options/test/VW/test_wfc.yml"
+            ]
+        },
+        {
             "name": "radn_test",
             "type": "python",
             "request": "launch",
@@ -126,7 +137,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-opt",
-                "options/test/RADN/test_radn.yml"
+                "options/test/RADN/test_radn_parallel.yml"
             ]
         },
         {

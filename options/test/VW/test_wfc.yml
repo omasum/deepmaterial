@@ -28,7 +28,7 @@ datasets:
 
 # network structures
 network_g:
-  type: VGG_wfc_sf_test
+  type: wfc_sf_test
   brdf_args:
     nbRendering: 1
     size: 256
@@ -41,7 +41,7 @@ network_g:
 #   type: PatchDiscriminator
 # path
 path:
-  pretrain_network_g: /home/cjm/DeepMaterial/experiments/001_VW/models/net_g_latest.pth
+  pretrain_network_g: /home/cjm/DeepMaterial/experiments/001_WSF/models/net_g_400000.pth
   strict_load_g: true
   # resume_state: experiments/001_SurfaceNet/training_states/609.state
 
