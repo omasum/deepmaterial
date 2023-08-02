@@ -1,5 +1,5 @@
 # general settings
-name: 001_UNETwoHF  # initialization
+name: 001_UNET  # initialization
 
 model_type: HighFrequency
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -56,7 +56,7 @@ datasets:
 
 # network structures
 network_g:
-  type: U_NETwoHF
+  type: U_NET
   brdf_args:
     nbRendering: 1
     size: 256
@@ -89,13 +89,9 @@ train:
   warmup_iter: -1  # no warm up
 
   # losses
-  highfrequency_opt:
-    type: L1Loss
-    loss_weight: 0.5
-    reduction: mean
   pixel_opt:
     type: L1Loss
-    loss_weight: 0.5
+    loss_weight: 1
     reduction: mean
 # validation settings
 val:
@@ -113,6 +109,7 @@ val:
 
 # logging settings
 logger:
+  # print_freq: 10
   print_freq: 1000
   save_checkpoint_freq: !!float 5e4
   use_tb_logger: true

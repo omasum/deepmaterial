@@ -1413,11 +1413,11 @@ if __name__ == "__main__":
     brdfArgs['nbRendering'] = 1
     brdfArgs['size'] = 256
     brdfArgs['order'] = 'pndrs'
-    brdfArgs['toLDR'] = False
+    brdfArgs['toLDR'] = True
     brdfArgs['lampIntensity'] = 1
     import torchvision
     if True:
-        path = '/home/sda/svBRDFs/testBlended/0000005;PolishedMarbleFloor_01Xmetal_bumpy_squares;0Xdefault.png' # [256, 256*5]indrs
+        path = '/home/sda/svBRDFs/testBlended/0000006;PolishedMarbleFloor_01Xleather_tiles;4X0.png' # [256, 256*5]indrs
         # path = '/home/sda/svBRDFs/testBlended/0000033;brick_uneven_stonesXPolishedMarbleFloor_01;2Xdefault.png'
         # path = '/home/sda/svBRDFs/testBlended/0000040;brick_uneven_stonesXleather_tiles;2X0.png'
         svbrdf = PlanarSVBRDF(brdfArgs)

@@ -71,7 +71,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-opt",
-                "options/train/RADN/train_radn_parallel.yml"
+                "options/train/RADN/train_radn_parallel_reweightloss.yml"
             ]
         },
         {
@@ -137,7 +137,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-opt",
-                "options/test/RADN/test_radn_parallel.yml"
+                "options/test/RADN/test_unet.yml"
             ]
         },
         {

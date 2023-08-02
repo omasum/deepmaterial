@@ -546,8 +546,8 @@ class areaDataset(svbrdfDataset):
                 if self.light_mode == 'point':
                     inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False)
                     inputs_img = inputs ** 0.4545
-                else:
-                    inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False, light_dir = torch.tensor([0, 0.3, 1]))
+                else: # parallel
+                    inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False, light_dir = torch.tensor([0, 0.3, 1])) # no gamma
                     inputs_img = inputs ** 0.4545
                 
         if not self.opt.get('gamma', True):
@@ -557,8 +557,8 @@ class areaDataset(svbrdfDataset):
             inputs = log_normalization(inputs)
         inputs = preprocess(inputs)
         result = {
-            'inputs': inputs, # input of net
-            'imgs': inputs_img, # show
+            'inputs': inputs, # input of net, without gamma
+            'imgs': inputs_img, # show, with gamma
             'svbrdfs': svbrdfs,
             'name': os.path.basename(img_path)
         }

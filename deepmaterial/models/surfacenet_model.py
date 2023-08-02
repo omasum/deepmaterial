@@ -12,6 +12,7 @@ from .base_model import BaseModel
 import torch
 import importlib
 import os.path as osp
+from pytorch_wavelets import DWTForward, DWTInverse
 metric_module = importlib.import_module('deepmaterial.metrics')
 logger = logging.getLogger('deepmaterial')
 
@@ -67,6 +68,11 @@ class SurfaceNetModel(BaseModel):
             self.cri_render = build_loss(train_opt['render_opt']).to(self.device)
         else:
             self.cri_render = None
+        # add frequency loss
+        if train_opt.get('highfrequency_opt'):
+            self.cri_highfrequency = build_loss(train_opt['highfrequency_opt']).to(self.device)
+        else:
+            self.cri_highfrequency = None
         if train_opt.get('msssim_opt'):
             self.cri_msssim = build_loss(train_opt['msssim_opt']).to(self.device)
         else:
@@ -85,6 +91,8 @@ class SurfaceNetModel(BaseModel):
         
         # set g
         optim_params = [param for param in self.net_g.parameters() if param.requires_grad]
+        for name,_ in self.net_g.named_parameters():
+            print(name)
         optim_type = train_opt['optim_g'].pop('type')
         self.optimizer_g = self.get_optimizer(optim_type, optim_params, **train_opt['optim_g'])
         self.optimizers.append(self.optimizer_g)
@@ -154,7 +162,8 @@ class SurfaceNetModel(BaseModel):
         self.log_dict = self.reduce_loss_dict(loss_dict)
 
     def brdfLoss(self, normal, diffuse, roughness, specular, loss_dict, isDesc=False):
-        fake_img = torch.cat([self.inputs,normal,diffuse,roughness,specular],dim=1)
+        if self.cri_gan is not None:
+            fake_img = torch.cat([self.inputs,normal,diffuse,roughness,specular],dim=1)
         l_total = 0
         if not isDesc:
             if self.cri_render is not None:
@@ -185,6 +194,12 @@ class SurfaceNetModel(BaseModel):
                 l_g = self.cri_gan(fake_pred,True,is_disc=False)
                 loss_dict['l_g'] = l_g
                 l_total += l_g
+            if self.cri_highfrequency is not None:
+                r = torch.cat([roughness]*3, dim=1)
+                output = torch.cat([normal, diffuse, r, specular], dim=1)
+                l_pix = self.cri_highfrequency(self.HFrequency(output), self.gt_h)
+                loss_dict['l_frequencypix'] = l_pix
+                l_total += l_pix
             return l_total
         else:
             fake_pred = self.net_d(fake_img.detach())    
@@ -195,7 +210,46 @@ class SurfaceNetModel(BaseModel):
             loss_dict['l_d'] = l_d
             loss_dict['real_score'] = real_pred.detach().mean()
             loss_dict['fake_score'] = fake_pred.detach().mean()
-            return l_d    
+            return l_d  
+
+    def HFrequency(self, svbrdf):
+        gt_normal = self.grayImg((svbrdf[:,:3] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_diffuse = self.grayImg((svbrdf[:,3:6] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_roughness = self.grayImg((svbrdf[:,6:7].repeat(1,3,1,1) + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_specular = self.grayImg((svbrdf[:,7:10] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        h_normal = self.decomposition(gt_normal)
+        h_roughness = self.decomposition(gt_roughness)
+        h_specular = self.decomposition(gt_specular)
+        h_diffuse = self.decomposition(gt_diffuse)
+        gt_h = torch.cat([h_normal, h_diffuse, h_roughness, h_specular], dim=1)
+        return gt_h
+
+    def grayImg(self, img):
+        '''
+            turn RGB images [B, 3, H, W] to Gray images, range(0,255), size[B, 1, H, W]
+        '''
+        image = torch.unsqueeze(1/3*img[:,0,:,:] + 1/3*img[:,1,:,:] + 1/3*img[:,2,:,:], dim=1)
+        return image 
+
+    def decomposition(self, img):
+        '''
+            turn gray img [B, 1, H, W] to dwt highfrequency[B, 3, H/2, W/2]
+        '''
+        self.dwt = DWTForward(J=1, wave='haar', mode='zero')
+        self.idwt = DWTInverse(wave='haar', mode='zero')
+        f_inputl, f_inputh = self.dwt(img.cpu()) # f_inputh is a list with level elements
+        f_inputh[0] = torch.round(f_inputh[0]*100000.0)/100000.0
+        HighFrequency = f_inputh[0].cuda() # [B, 1, 3, H/2, W/2]
+        HighFrequency = torch.cat([HighFrequency[:,:,0,:,:],HighFrequency[:,:,1,:,:],HighFrequency[:,:,2,:,:]], dim=1) # [B, 3, H/2, W/2]
+        HighFrequency = self.norm(HighFrequency)
+        return HighFrequency
+
+    def norm(self,x):
+        '''
+            convert value range to [-1,1]
+        '''  
+        eps = 1e-20
+        return 2.0*((x-torch.min(x))/(torch.max(x)-torch.min(x) + eps)) - 1.0
 
     def test(self):
         self.net_g.eval()

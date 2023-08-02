@@ -114,6 +114,8 @@ class VW_testModel(SurfaceNetModel):
                         error = self.cri_cos(self.output, self.svbrdf)*opt_.pop('weight')
                     elif metric_type == 'pix':
                         error = torch.abs(self.output-self.svbrdf).mean()*opt_.pop('weight')
+                    elif metric_type == 'dwt':
+                        error = torch.abs(self.HFrequencyGT(self.output) - self.HFrequencyGT(self.svbrdf)).mean()*opt_.pop('weight')
                     self.metric_results[name] += error 
             torch.cuda.empty_cache()
             if self.opt.get('pbar',True):
@@ -128,6 +130,18 @@ class VW_testModel(SurfaceNetModel):
                 self.metric_results[metric] /= (idx + 1)
             self._log_validation_metric_values(current_iter, dataset_name,
                                                 tb_logger)
+                                            
+    def HFrequencyGT(self, svbrdf):
+        gt_normal = self.grayImg((svbrdf[:,:3] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_diffuse = self.grayImg((svbrdf[:,3:6] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_roughness = self.grayImg((svbrdf[:,6:7].repeat(1,3,1,1) + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_specular = self.grayImg((svbrdf[:,7:10] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        h_normal = self.decomposition(gt_normal)
+        h_roughness = self.decomposition(gt_roughness)
+        h_specular = self.decomposition(gt_specular)
+        h_diffuse = self.decomposition(gt_diffuse)
+        gt_h = torch.cat([h_normal, h_diffuse, h_roughness, h_specular], dim=1)
+        return gt_h
     
     def get_current_visuals(self, pred, gt, filter):
         out_dict = OrderedDict()

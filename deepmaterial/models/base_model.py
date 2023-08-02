@@ -194,8 +194,10 @@ class BaseModel():
             for key, param in state_dict.items():
                 if key.startswith('module.'):  # remove unnecessary 'module.'
                     key = key[7:]
+                # print(key)
                 state_dict[key] = param.cpu()
             save_dict[param_key_] = state_dict
+            # print(param_key_)
 
         torch.save(save_dict, save_path)
 
@@ -258,6 +260,8 @@ class BaseModel():
                 load_net[k[7:]] = v
                 load_net.pop(k)
             if k.startswith('step_counter'):
+                load_net.pop(k)
+            if k.startswith('dwt') or k.startswith('idwt'):
                 load_net.pop(k)
         self._print_different_keys_loading(net, load_net, strict)
         net.load_state_dict(load_net, strict=strict)
