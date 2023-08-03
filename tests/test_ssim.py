@@ -1,12 +1,22 @@
 import os
 from deepmaterial.metrics.psnr_ssim import ssim
 import time
+import cv2
+import torch
+
+def Readimg(img):
+    original1 = cv2.imread(img)
+    original = cv2.cvtColor(original1, cv2.COLOR_BGR2RGB) # [256, 256, 3]
+    original = torch.tensor(original.transpose(2, 0, 1), dtype=torch.float32)
+    original = torch.unsqueeze(original, dim=0)
+    return original
 
 if __name__ =='__main__':
     starttime= time.time()
-    result_root='/home/klkjjhjkhjhg/code/DeepMaterial/results'
-    surffix = 'visualization/areaDataset'
-    metrics = Metrics("RMSE")
-    explist = ['003_LSDN', '006_LSDN']
-    for exp in explist:
-        metrics.svbrdfs_from_dir("/home/sda/svBRDFs/testBlended",os.path.join(result_root, exp, surffix), exp_name=exp)
+    path1 = "tmp/test-parallel.png"
+    path2 = "tmp/gimg.png"
+    # path2 = "tmp/test-point.png"
+    img = Readimg(path1)
+    img2 = Readimg(path2)
+    value = ssim(img, img2)
+    print(value)

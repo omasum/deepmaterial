@@ -11,6 +11,8 @@ import os.path as osp
 from tqdm import tqdm
 from copy import deepcopy
 import cv2
+from pytorch_wavelets import DWTForward, DWTInverse
+from deepmaterial.metrics.psnr_ssim import ssim
 
 from deepmaterial.utils.wrapper_util import timmer
 metric_module = importlib.import_module('deepmaterial.metrics')
@@ -26,23 +28,51 @@ class HighFrequency(SurfaceNetModel):
     def feed_data(self, data):
         self.svbrdf = data['svbrdfs'].cuda()
         self.inputs = data['inputs'].cuda()
-        self.gt_h = self.HFrequencyGT()
+        self.gt_h = self.HFrequencyGT(self.svbrdf)
 
-    def HFrequencyGT(self):
+    def HFrequencyGT(self, svbrdf):
         '''
             turn svbrdf[B, 10, H, W] to svbrdf image dwt decomposition[B, 12, H/2, W/2], range [-1, 1]
         
         '''
-        gt_normal = self.grayImg((self.svbrdf[:,:3] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        gt_diffuse = self.grayImg((self.svbrdf[:,3:6] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        gt_roughness = self.grayImg((self.svbrdf[:,6:7].repeat(1,3,1,1) + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        gt_specular = self.grayImg((self.svbrdf[:,7:10] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_normal = self.grayImg((svbrdf[:,:3] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_diffuse = self.grayImg((svbrdf[:,3:6] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_roughness = self.grayImg((svbrdf[:,6:7].repeat(1,3,1,1) + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_specular = self.grayImg((svbrdf[:,7:10] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
         h_normal = self.decomposition(gt_normal)
         h_roughness = self.decomposition(gt_roughness)
         h_specular = self.decomposition(gt_specular)
         h_diffuse = self.decomposition(gt_diffuse)
         gt_h = torch.cat([h_normal, h_diffuse, h_roughness, h_specular], dim=1)
         return gt_h
+    
+    def LFrequencyGT(self, svbrdf):
+        '''
+            turn svbrdf[B, 10, H, W] to svbrdf image dwt decomposition[B, 4, H/2, W/2], range [-1, 1]
+        
+        '''
+        gt_normal = self.grayImg((svbrdf[:,:3] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_diffuse = self.grayImg((svbrdf[:,3:6] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_roughness = self.grayImg((svbrdf[:,6:7].repeat(1,3,1,1) + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_specular = self.grayImg((svbrdf[:,7:10] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        h_normal = self.decomposition(gt_normal)
+        h_roughness = self.decomposition(gt_roughness)
+        h_specular = self.decomposition(gt_specular)
+        h_diffuse = self.decomposition(gt_diffuse)
+        gt_h = torch.cat([h_normal, h_diffuse, h_roughness, h_specular], dim=1)
+        return gt_h
+    
+    def GetLowFrequency(self, img):
+        '''
+            turn gray img [B, 1, H, W] to dwt highfrequency[B, 1, H/2, W/2]
+        '''
+        self.dwt = DWTForward(J=1, wave='haar', mode='zero')
+        self.idwt = DWTInverse(wave='haar', mode='zero')
+        f_inputl, f_inputh = self.dwt(img.cpu())
+        f_inputl = torch.round(f_inputl*100000.0)/100000.0
+        LowFrequency = f_inputl.cuda()
+        LowFrequency = self.norm(LowFrequency)
+        return LowFrequency
 
     def debug_rendering(self, gt, pred):
         c,h,w = gt.shape[-3:]
@@ -87,7 +117,6 @@ class HighFrequency(SurfaceNetModel):
         return self.brdfLoss(normal, diffuse, roughness, specular, loss_dict, isDesc)
     
 
-
     def validation(self, dataloader, current_iter, tb_logger, save_img=False):
         dataset_name = dataloader.dataset.opt['name']
         with_metrics = self.opt['val'].get('metrics') is not None
@@ -121,8 +150,14 @@ class HighFrequency(SurfaceNetModel):
                     metric_type = opt_.pop('type')
                     if metric_type == 'cos':
                         error = self.cri_cos(self.output, self.svbrdf)*opt_.pop('weight')
+                    elif metric_type == 'HF':
+                        error = torch.abs(self.HFrequencyGT(self.output) - self.HFrequencyGT(self.svbrdf)).mean()*opt_.pop('weight')
+                    elif metric_type == 'LF':
+                        error = torch.abs(self.LFrequencyGT(self.output)-self.LFrequencyGT(self.svbrdf)).mean()*opt_.pop('weight')
                     elif metric_type == 'pix':
                         error = torch.abs(self.output-self.svbrdf).mean()*opt_.pop('weight')
+                    elif metric_type == 'ssim':
+                        error = torch.abs(ssim(self.deprocess(self.output), self.deprocess(self.svbrdf)))*opt_.pop('weight')
                     self.metric_results[name] += error 
             torch.cuda.empty_cache()
             if self.opt.get('pbar',True):
