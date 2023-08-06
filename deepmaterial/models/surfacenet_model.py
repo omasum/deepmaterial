@@ -213,15 +213,15 @@ class SurfaceNetModel(BaseModel):
             return l_d  
 
     def HFrequency(self, svbrdf):
-        gt_normal = self.grayImg((svbrdf[:,:3] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        gt_diffuse = self.grayImg((svbrdf[:,3:6] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        gt_roughness = self.grayImg((svbrdf[:,6:7].repeat(1,3,1,1) + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        gt_specular = self.grayImg((svbrdf[:,7:10] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_normal = (svbrdf[:,:3] + 1.0) / 2.0 * 255.0 # range(0, 255.0)
+        gt_diffuse = (svbrdf[:,3:6] + 1.0) / 2.0 * 255.0 # range(0, 255.0)
+        gt_roughness = (svbrdf[:,6:7].repeat(1,3,1,1) + 1.0) / 2.0 * 255.0 # range(0, 255.0)
+        gt_specular = (svbrdf[:,7:10] + 1.0) / 2.0 * 255.0 # range(0, 255.0)
         h_normal = self.decomposition(gt_normal)
         h_roughness = self.decomposition(gt_roughness)
         h_specular = self.decomposition(gt_specular)
         h_diffuse = self.decomposition(gt_diffuse)
-        gt_h = torch.cat([h_normal, h_diffuse, h_roughness, h_specular], dim=1)
+        gt_h = torch.cat([h_normal, h_diffuse, h_roughness, h_specular], dim=1) #[B, 3*3*4, H/2, W/2]
         return gt_h
 
     def grayImg(self, img):
@@ -233,15 +233,15 @@ class SurfaceNetModel(BaseModel):
 
     def decomposition(self, img):
         '''
-            turn gray img [B, 1, H, W] to dwt highfrequency[B, 3, H/2, W/2]
+            turn gray img [B, 3, H, W] to dwt highfrequency[B, 9, H/2, W/2]
         '''
         self.dwt = DWTForward(J=1, wave='haar', mode='zero')
         self.idwt = DWTInverse(wave='haar', mode='zero')
         f_inputl, f_inputh = self.dwt(img.cpu()) # f_inputh is a list with level elements
         f_inputh[0] = torch.round(f_inputh[0]*100000.0)/100000.0
-        HighFrequency = f_inputh[0].cuda() # [B, 1, 3, H/2, W/2]
-        HighFrequency = torch.cat([HighFrequency[:,:,0,:,:],HighFrequency[:,:,1,:,:],HighFrequency[:,:,2,:,:]], dim=1) # [B, 3, H/2, W/2]
-        HighFrequency = self.norm(HighFrequency)
+        HighFrequency = f_inputh[0].cuda() # [B, 3, 3, H/2, W/2]
+        HighFrequency = torch.cat([HighFrequency[:,:,0,:,:],HighFrequency[:,:,1,:,:],HighFrequency[:,:,2,:,:]], dim=1) # [B, 3*3, H/2, W/2]
+        # HighFrequency = self.norm(HighFrequency)
         return HighFrequency
 
     def norm(self,x):

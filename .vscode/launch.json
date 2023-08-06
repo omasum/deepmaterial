@@ -71,7 +71,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-opt",
-                "options/train/RADN/train_radn_parallel.yml"
+                "options/train/RADN/train_radn_parallel_woHF.yml"
             ]
         },
         {

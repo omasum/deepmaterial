@@ -72,7 +72,7 @@ network_g:
 path:
   # pretrain_network_g: ~
   strict_load_g: true
-  # resume_state: experiments/001_SurfaceNet/training_states/609.state
+  resume_state: experiments/001_UNET1v1/training_states/50000.state
 
 # training settings
 train:

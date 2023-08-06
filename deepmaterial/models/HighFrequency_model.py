@@ -35,43 +35,43 @@ class HighFrequency(SurfaceNetModel):
             turn svbrdf[B, 10, H, W] to svbrdf image dwt decomposition[B, 12, H/2, W/2], range [-1, 1]
         
         '''
-        gt_normal = self.grayImg((svbrdf[:,:3] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        gt_diffuse = self.grayImg((svbrdf[:,3:6] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        gt_roughness = self.grayImg((svbrdf[:,6:7].repeat(1,3,1,1) + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        gt_specular = self.grayImg((svbrdf[:,7:10] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
+        gt_normal = (svbrdf[:,:3] + 1.0) / 2.0 * 255.0 # range(0, 255.0)
+        gt_diffuse = (svbrdf[:,3:6] + 1.0) / 2.0 * 255.0 # range(0, 255.0)
+        gt_roughness = (svbrdf[:,6:7].repeat(1,3,1,1) + 1.0) / 2.0 * 255.0 # range(0, 255.0)
+        gt_specular = (svbrdf[:,7:10] + 1.0) / 2.0 * 255.0 # range(0, 255.0)
         h_normal = self.decomposition(gt_normal)
         h_roughness = self.decomposition(gt_roughness)
         h_specular = self.decomposition(gt_specular)
         h_diffuse = self.decomposition(gt_diffuse)
-        gt_h = torch.cat([h_normal, h_diffuse, h_roughness, h_specular], dim=1)
+        gt_h = torch.cat([h_normal, h_diffuse, h_roughness, h_specular], dim=1) #[B, 3*3*4, H/2, W/2]
         return gt_h
     
     def LFrequencyGT(self, svbrdf):
         '''
-            turn svbrdf[B, 10, H, W] to svbrdf image dwt decomposition[B, 4, H/2, W/2], range [-1, 1]
+            turn svbrdf[B, 10, H, W] to svbrdf image dwt decomposition[B, 4*3, H/2, W/2], range [-1, 1]
         
         '''
         gt_normal = self.grayImg((svbrdf[:,:3] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
         gt_diffuse = self.grayImg((svbrdf[:,3:6] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
         gt_roughness = self.grayImg((svbrdf[:,6:7].repeat(1,3,1,1) + 1.0) / 2.0 * 255.0) # range(0, 255.0)
         gt_specular = self.grayImg((svbrdf[:,7:10] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        h_normal = self.decomposition(gt_normal)
-        h_roughness = self.decomposition(gt_roughness)
-        h_specular = self.decomposition(gt_specular)
-        h_diffuse = self.decomposition(gt_diffuse)
+        h_normal = self.GetLowFrequency(gt_normal)
+        h_roughness = self.GetLowFrequency(gt_roughness)
+        h_specular = self.GetLowFrequency(gt_specular)
+        h_diffuse = self.GetLowFrequency(gt_diffuse)
         gt_h = torch.cat([h_normal, h_diffuse, h_roughness, h_specular], dim=1)
         return gt_h
     
     def GetLowFrequency(self, img):
         '''
-            turn gray img [B, 1, H, W] to dwt highfrequency[B, 1, H/2, W/2]
+            turn gray img [B, 3, H, W] to dwt highfrequency[B, 3, H/2, W/2]
         '''
         self.dwt = DWTForward(J=1, wave='haar', mode='zero')
         self.idwt = DWTInverse(wave='haar', mode='zero')
         f_inputl, f_inputh = self.dwt(img.cpu())
         f_inputl = torch.round(f_inputl*100000.0)/100000.0
         LowFrequency = f_inputl.cuda()
-        LowFrequency = self.norm(LowFrequency)
+        # LowFrequency = self.norm(LowFrequency)
         return LowFrequency
 
     def debug_rendering(self, gt, pred):
@@ -150,12 +150,23 @@ class HighFrequency(SurfaceNetModel):
                     metric_type = opt_.pop('type')
                     if metric_type == 'cos':
                         error = self.cri_cos(self.output, self.svbrdf)*opt_.pop('weight')
+
                     elif metric_type == 'HF':
-                        error = torch.abs(self.HFrequencyGT(self.output) - self.HFrequencyGT(self.svbrdf)).mean()*opt_.pop('weight')
+                        error = torch.abs(self.HFrequencyGT(self.output)-self.HFrequencyGT(self.svbrdf)).mean()*opt_.pop('weight')
+                    
                     elif metric_type == 'LF':
                         error = torch.abs(self.LFrequencyGT(self.output)-self.LFrequencyGT(self.svbrdf)).mean()*opt_.pop('weight')
+
                     elif metric_type == 'pix':
                         error = torch.abs(self.output-self.svbrdf).mean()*opt_.pop('weight')
+                    elif metric_type == 'normal_pix':
+                        error = torch.abs(self.output[:, :3] - self.svbrdf[:, :3]).mean()*opt_.pop('weight')
+                    elif metric_type == 'diffuse_pix':
+                        error = torch.abs(self.output[:, 3:6] - self.svbrdf[:, 3:6]).mean()*opt_.pop('weight')
+                    elif metric_type == 'roughness_pix':
+                        error = torch.abs(self.output[:, 6:7] - self.svbrdf[:, 6:7]).mean()*opt_.pop('weight')
+                    elif metric_type == 'specular_pix':
+                        error = torch.abs(self.output[:, 7:10] - self.svbrdf[:, 7:10]).mean()*opt_.pop('weight')
                     elif metric_type == 'ssim':
                         error = torch.abs(ssim(self.deprocess(self.output), self.deprocess(self.svbrdf)))*opt_.pop('weight')
                     self.metric_results[name] += error 
@@ -172,6 +183,19 @@ class HighFrequency(SurfaceNetModel):
                 self.metric_results[metric] /= (idx + 1)
             self._log_validation_metric_values(current_iter, dataset_name,
                                                 tb_logger)
+    
+    def SplitFrequency(self, Frequency):
+        '''
+
+            Arg:
+            Frequency:[B, 12, H/2, W/2] or [B, 4, H/2, W/2]
+            Return:
+            tensor[nFrequency, dFrequency, rFrequency, sFrequency], [4,B,3,H/2,W/2] or [4, B, 1, H/2, W/2]
+        
+        '''
+        featureFrequency = torch.split(Frequency, split_size_or_sections=int(Frequency.shape[1]/4), dim=1)
+        result = torch.cat([featureFrequency[0].unsqueeze_(dim=0), featureFrequency[1].unsqueeze_(dim=0), featureFrequency[2].unsqueeze_(dim=0), featureFrequency[3].unsqueeze_(dim=0)], dim=0)
+        return result
 
 
     def deprocess(self,m_img):
@@ -252,6 +276,6 @@ class HighFrequency(SurfaceNetModel):
             b, c, h, w = self.inputs.shape
             self.HighFrequency, output = self.net_g(self.inputs)
             normal, diffuse,roughness,specular = torch.split(output,[2,3,1,3],dim=1)
-            normal = torch_norm(torch.cat([normal,torch.ones((b,1,h,w), device=self.device)], dim=1),dim=1)
+            normal = torch_norm(torch.cat([normal, torch.ones((b,1,h,w), device=self.device)], dim=1),dim=1)
             self.output = torch.cat([normal, diffuse, roughness, specular],dim=1)
         self.net_g.train()
