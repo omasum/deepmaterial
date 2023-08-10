@@ -1417,7 +1417,7 @@ if __name__ == "__main__":
     brdfArgs['lampIntensity'] = 1
     import torchvision
     if True:
-        path = '/home/sda/svBRDFs/testBlended/0000006;PolishedMarbleFloor_01Xleather_tiles;4X0.png' # [256, 256*5]indrs
+        path = '/home/sda/svBRDFs/testBlended/0000010;PolishedMarbleFloor_01Xleather_tiles;3Xdefault.png' # [256, 256*5]indrs
         # path = '/home/sda/svBRDFs/testBlended/0000033;brick_uneven_stonesXPolishedMarbleFloor_01;2Xdefault.png'
         # path = '/home/sda/svBRDFs/testBlended/0000040;brick_uneven_stonesXleather_tiles;2X0.png'
         svbrdf = PlanarSVBRDF(brdfArgs)

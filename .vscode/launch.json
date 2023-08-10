@@ -71,7 +71,18 @@
             "console": "integratedTerminal",
             "args": [
                 "-opt",
-                "options/train/RADN/train_radn_parallel_woHF.yml"
+                "options/train/RADN/train_radn_parallel_onlyHF.yml"
+            ]
+        },
+        {
+            "name": "NewVA_train",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-opt",
+                "options/train/NewVA/train_NewVAL1Loss.yml"
             ]
         },
         {
