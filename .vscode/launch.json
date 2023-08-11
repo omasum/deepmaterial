@@ -85,6 +85,17 @@
             ]
         },
         {
+            "name": "nafnet_train",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-opt",
+                "options/train/NAFNet/nafnetwoHFL1Loss.yml"
+            ]
+        },
+        {
             "name": "NewVA_train",
             "type": "python",
             "request": "launch",

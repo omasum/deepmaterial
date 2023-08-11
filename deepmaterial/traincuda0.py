@@ -6,9 +6,10 @@ import random
 import time
 from os import path as osp
 import os, traceback, sys
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import torch
 import setproctitle
+import torch.distributed as dist
 
 from deepmaterial.utils.misc import cp_options
 
