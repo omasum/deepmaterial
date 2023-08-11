@@ -1,0 +1,90 @@
+# general settings
+name: NewVAwoHFL1Loss  # initialization
+
+model_type: NewVA
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+manual_seed: 10
+
+# dataset and data loader settings
+datasets:
+  test:
+    name: areaDataset
+    type: areaDataset
+    brdf_args:
+      nbRendering: 1
+      size: 256
+      order: pndrs
+      toLDR: True
+      lampIntensity: 1
+      lightdir: [0, 0.3, 1]
+    data_path: /home/sda/svBRDFs/testBlended # Ruby
+    # data_path: /home/xh/cjm/18single_image/Data_Deschaintre18/trainBlended # 2080Ti
+    # data_path: /home/xh/cjm/18single_image/Data_Deschaintre18/testBlended # 2080Ti
+    # rendering_path: /home/sda/svBRDFs/
+    log: False
+    gamma: False
+    light_mode: parallel
+    input_mode: render
+    io_backend: 
+      type: disk
+    # len: 18
+
+# network structures
+network_g:
+  type: NewVANet
+  input_channel: 3
+  output_channel: 3
+  rough_channel: 1
+  brdf_args:
+    nbRendering: 1
+    size: 256
+    order: pndrs
+    toLDR: True
+    lampIntensity: 1
+    lightdir: [0, 0.3, 1]
+
+# network_d:
+#   type: PatchDiscriminator
+# path
+path:
+  pretrain_network_g: experiments/001_NewVAL1Loss/models/net_g_latest.pth
+  strict_load_g: true
+  # resume_state: experiments/001_SurfaceNet/training_states/609.state
+
+# validation settings
+val:
+  save_img: True
+  save_gt: True
+
+  metrics:
+    # cosine: # metric name, can be arbitrary
+    #   type: cos
+    #   weight: 2
+    pixel: # metric name, can be arbitrary
+      type: pix
+      weight: 1
+    highfrequency: # metric name, can be arbitrary
+      type: HF
+      weight: 1
+    normal_error: # metric name, can be arbitrary
+      type: normal_pix
+      weight: 1
+    diffuse_error: # metric name, can be arbitrary
+      type: diffuse_pix
+      weight: 1
+    roughness_error: # metric name, can be arbitrary
+      type: roughness_pix
+      weight: 1
+    specular_error: # metric name, can be arbitrary
+      type: specular_pix
+      weight: 1
+    lowfrequency: # metric name, can be arbitrary
+      type: LF
+      weight: 1
+    SSIM:
+      type: ssim
+      weight: 1
+
+# logging settings
+logger:
+  use_tb_logger: true

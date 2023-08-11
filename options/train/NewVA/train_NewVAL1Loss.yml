@@ -1,5 +1,5 @@
 # general settings
-name: 001_NewVAL1Loss  # initialization
+name: 001_NewVABNL1Loss  # initialization
 
 model_type: NewVA
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -58,7 +58,7 @@ datasets:
 
 # network structures
 network_g:
-  type: NewVANet
+  type: NewVANetBN
   input_channel: 3
   output_channel: 3
   rough_channel: 1

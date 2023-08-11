@@ -29,7 +29,17 @@
                 "options/test/VW/test_vwsf.yml"
             ]
         },
-        
+        {
+            "name": "test_newVA",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "-opt",
+                "options/test/NewVA/test_newVA.yml"
+            ]
+        },
         {
             "name": "msan_test",
             "type": "python",
@@ -148,7 +158,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-opt",
-                "options/test/RADN/test_unet.yml"
+                "options/test/RADN/test_onlyHF.yml"
             ]
         },
         {
