@@ -13,7 +13,7 @@ from deepmaterial.archs.U_Net import *
 from deepmaterial.utils.materialmodifier import materialmodifier_L6
 
 @ARCH_REGISTRY.register()
-class U_NET(nn.Module):
+class U_NETconcat(nn.Module):
 
     '''
         N_Net arch.
@@ -22,7 +22,7 @@ class U_NET(nn.Module):
     '''
     
     def __init__(self):
-        super(U_NET, self).__init__()
+        super(U_NETconcat, self).__init__()
         # self.unet = UNet(3,12)
         self.encodern = subEncoder(8, layers = True, bilinear=True)
         self.encoderd = subEncoder(8, layers = True, bilinear=True)
@@ -33,10 +33,6 @@ class U_NET(nn.Module):
         self.decoderd = subDecoder(3, 3)
         self.decoderr = subDecoder(3, 1)
         self.decoders = subDecoder(3, 3)
-        self.fusionn = SELayer(512)
-        self.fusiond = SELayer(512)
-        self.fusionr = SELayer(512)
-        self.fusions = SELayer(512)
         
 
     def forward(self, x):
@@ -46,10 +42,10 @@ class U_NET(nn.Module):
         _, _, _, self.rcode = self.encoderr(self.HighFrequency) # [batchsize, 256, 16, 16]
         _, _, _, self.scode = self.encoders(self.HighFrequency) # [batchsize, 256, 16, 16]
         self.colorcode1, self.colorcode2, self.colorcode3, self.colorcode = self.encoder(x)
-        self.final_ncode = self.fusionn(torch.cat([self.ncode, self.colorcode], dim=1)) #[B, 512, 16, 16]
-        self.final_dcode = self.fusiond(torch.cat([self.dcode, self.colorcode], dim=1)) #[B, 512, 16, 16]
-        self.final_rcode = self.fusionr(torch.cat([self.rcode, self.colorcode], dim=1)) #[B, 512, 16, 16]
-        self.final_scode = self.fusions(torch.cat([self.scode, self.colorcode], dim=1)) #[B, 512, 16, 16]
+        self.final_ncode = torch.cat([self.ncode, self.colorcode], dim=1) #[B, 512, 16, 16]
+        self.final_dcode = torch.cat([self.dcode, self.colorcode], dim=1) #[B, 512, 16, 16]
+        self.final_rcode = torch.cat([self.rcode, self.colorcode], dim=1) #[B, 512, 16, 16]
+        self.final_scode = torch.cat([self.scode, self.colorcode], dim=1) #[B, 512, 16, 16]
         self.normal = self.decodern(self.final_ncode, self.colorcode3, self.colorcode2, self.colorcode1)
         self.diffuse = self.decoderd(self.final_dcode, self.colorcode3, self.colorcode2, self.colorcode1) # [batchsize, 3, h, w]
         self.roughness = self.decoderr(self.final_rcode, self.colorcode3, self.colorcode2, self.colorcode1) # [batchsize, 3, h, w]
@@ -110,7 +106,7 @@ class U_NET(nn.Module):
 
 
 def test():
-    net = U_NET
+    net = U_NETconcat
     x = torch.randn(2,3,32,32)
     y = net(x)
     print(y.size())

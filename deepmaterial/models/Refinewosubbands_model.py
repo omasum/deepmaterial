@@ -15,71 +15,22 @@ from pytorch_wavelets import DWTForward, DWTInverse
 from deepmaterial.metrics.psnr_ssim import ssim
 
 from deepmaterial.utils.wrapper_util import timmer
+from deepmaterial.utils.materialmodifier import materialmodifier_L6
+
 metric_module = importlib.import_module('deepmaterial.metrics')
 logger = logging.getLogger('deepmaterial')
 
 
 @MODEL_REGISTRY.register()
-class HighFrequency(SurfaceNetModel):
+class Refinewosubbands(SurfaceNetModel):
 
     def __init__(self, opt):
-        super(HighFrequency, self).__init__(opt)     
+        super(Refinewosubbands, self).__init__(opt)     
 
     def feed_data(self, data):
-        self.svbrdf = data['svbrdfs'].cuda()
-        self.inputs = data['inputs'].cuda()
-        self.gt_h = self.HFrequencyGT(self.svbrdf)
-
-    def HFrequencyGT(self, svbrdf):
-        '''
-            turn svbrdf[B, 10, H, W] to svbrdf image dwt decomposition[B, 12, H/2, W/2], range [-1, 1]
-        
-        '''
-        gt_normal = (svbrdf[:,:3] + 1.0) / 2.0 * 255.0 # range(0, 255.0)
-        gt_diffuse = (svbrdf[:,3:6] + 1.0) / 2.0 * 255.0 # range(0, 255.0)
-        gt_roughness = (svbrdf[:,6:7].repeat(1,3,1,1) + 1.0) / 2.0 * 255.0 # range(0, 255.0)
-        gt_specular = (svbrdf[:,7:10] + 1.0) / 2.0 * 255.0 # range(0, 255.0)
-        h_normal = self.decomposition(gt_normal)
-        h_roughness = self.decomposition(gt_roughness)
-        h_specular = self.decomposition(gt_specular)
-        h_diffuse = self.decomposition(gt_diffuse)
-        gt_h = torch.cat([h_normal, h_diffuse, h_roughness, h_specular], dim=1) #[B, 3*3*4, H/2, W/2]
-        return gt_h
-    
-    def LFrequencyGT(self, svbrdf):
-        '''
-            turn svbrdf[B, 10, H, W] to svbrdf image dwt decomposition[B, 4*3, H/2, W/2], range [-1, 1]
-        
-        '''
-        gt_normal = self.grayImg((svbrdf[:,:3] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        gt_diffuse = self.grayImg((svbrdf[:,3:6] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        gt_roughness = self.grayImg((svbrdf[:,6:7].repeat(1,3,1,1) + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        gt_specular = self.grayImg((svbrdf[:,7:10] + 1.0) / 2.0 * 255.0) # range(0, 255.0)
-        h_normal = self.GetLowFrequency(gt_normal)
-        h_roughness = self.GetLowFrequency(gt_roughness)
-        h_specular = self.GetLowFrequency(gt_specular)
-        h_diffuse = self.GetLowFrequency(gt_diffuse)
-        gt_h = torch.cat([h_normal, h_diffuse, h_roughness, h_specular], dim=1)
-        return gt_h
-    
-    def GetLowFrequency(self, img):
-        '''
-            turn gray img [B, 3, H, W] to dwt highfrequency[B, 3, H/2, W/2]
-        '''
-        self.dwt = DWTForward(J=1, wave='haar', mode='zero')
-        self.idwt = DWTInverse(wave='haar', mode='zero')
-        f_inputl, f_inputh = self.dwt(img.cpu())
-        f_inputl = torch.round(f_inputl*100000.0)/100000.0
-        LowFrequency = f_inputl.cuda()
-        # LowFrequency = self.norm(LowFrequency)
-        return LowFrequency
-
-    def debug_rendering(self, gt, pred):
-        c,h,w = gt.shape[-3:]
-        gt = tensor2img(gt.view(-1, c, h, w), gamma=True)
-        pred =tensor2img(pred.view(-1, c, h, w), gamma=True)
-        output_img = np.concatenate([gt, pred], axis=0)
-        imwrite(output_img, 'tmp/debug_rendering.png', float2int=False)
+        self.svbrdf = data['svbrdfs'].cuda() # [b,3,h,w], gt normal
+        self.inputs = data['inputs'].cuda() # [b,3,h,w], pred normal
+        # self.gt_h = self.HFrequencyGT(self.svbrdf)
 
     def optimize_parameters(self, current_iter):
         loss_dict = OrderedDict()
@@ -93,7 +44,7 @@ class HighFrequency(SurfaceNetModel):
                 p.requires_grad = False
         
         self.optimizer_g.zero_grad()
-        self.HighFrequency, output = self.net_g(self.inputs)
+        output = self.net_g(self.inputs)
         l_total = self.computeLoss(output, loss_dict)
         l_total.backward()
         self.optimizer_g.step()
@@ -112,9 +63,18 @@ class HighFrequency(SurfaceNetModel):
         self.log_dict = self.reduce_loss_dict(loss_dict)
 
     def computeLoss(self, output, loss_dict, isDesc=False):
-        normal, diffuse,roughness,specular = torch.split(output,[2,3,1,3],dim=1)
-        normal = torch_norm(torch.cat([normal,torch.ones_like(roughness, device=self.device)], dim=1),dim=1)
-        return self.brdfLoss(normal, diffuse, roughness, specular, loss_dict, isDesc)
+        b, c, h, w = output.shape
+        normal = torch_norm(torch.cat([output,torch.ones([b,1,h,w], device=self.device)], dim=1),dim=1)
+        return self.brdfLoss(normal, loss_dict, isDesc)
+
+    def brdfLoss(self, normal, loss_dict, isDesc=False):
+        l_total = 0
+        if not isDesc:
+            gt = self.svbrdf
+            l_pix = self.cri_pix(normal, gt)
+            loss_dict['l_pix'] = l_pix
+            l_total += l_pix
+            return l_total 
     
 
     def validation(self, dataloader, current_iter, tb_logger, save_img=False):
@@ -184,19 +144,6 @@ class HighFrequency(SurfaceNetModel):
             self._log_validation_metric_values(current_iter, dataset_name,
                                                 tb_logger)
     
-    def SplitFrequency(self, Frequency):
-        '''
-
-            Arg:
-            Frequency:[B, 12, H/2, W/2] or [B, 4, H/2, W/2]
-            Return:
-            tensor[nFrequency, dFrequency, rFrequency, sFrequency], [4,B,3,H/2,W/2] or [4, B, 1, H/2, W/2]
-        
-        '''
-        featureFrequency = torch.split(Frequency, split_size_or_sections=int(Frequency.shape[1]/4), dim=1)
-        result = torch.cat([featureFrequency[0].unsqueeze_(dim=0), featureFrequency[1].unsqueeze_(dim=0), featureFrequency[2].unsqueeze_(dim=0), featureFrequency[3].unsqueeze_(dim=0)], dim=0)
-        return result
-
 
     def deprocess(self,m_img):
         '''depreocess images fed to network(-1,1) to initial images(0,255)
@@ -219,36 +166,11 @@ class HighFrequency(SurfaceNetModel):
         image = torch.clip(image, min=0.0, max=1.0)
         return image
 
-    # def save_visuals(self, path, pred, gt):
-    #     '''
-    #         pred. gt [B, 12, H/2, W/2], range[-1, 1]
-    #     '''
-    #     pred = pred*0.5+0.5 # [B, 12, H/2, W/2], range[0, 1]
-    #     gt = gt*0.5+0.5
-    #     input = self.HighFrequency*0.5+0.5 # [B, 3, H/2, W/2]
-    #     input = self.Split(input)
-    #     input = input.repeat(1, 3, 1, 1)
+    def save_visuals(self, path, pred, gt):
+        output = torch.cat([gt,pred],dim=2)*0.5+0.5 # [b,3,2*h,w]
 
-    #     normal, diffuse, roughness, specular = torch.split(pred,[3,3,3,3],dim=1) # list of [B, 3, H/2, W/2]
-    #     gt_normal, gt_diffuse, gt_roughness, gt_specular = torch.split(gt,[3,3,3,3],dim=1)
-    #     normal = self.Split(normal)
-    #     diffuse = self.Split(diffuse)
-    #     roughness = self.Split(roughness)
-    #     specular = self.Split(specular)
-    #     gt_normal = self.Split(gt_normal)
-    #     gt_diffuse = self.Split(gt_diffuse)
-    #     gt_roughness = self.Split(gt_roughness)
-    #     gt_specular = self.Split(gt_specular)
-
-    #     output = torch.cat([normal,diffuse,roughness,specular],dim=-1)
-    #     gt_output = torch.cat([gt_normal,gt_diffuse,gt_roughness,gt_specular],dim=-1)
-    #     result = torch.cat([output, gt_output], dim=2) # [B, 1, H*2, W*4]
-    #     result = result.repeat(1, 3, 1, 1) # [B, 3, H*2, W*4]
-    #     original_input = (self.inputs + 1.0)/2.0 # [B, 3, H, W]
-    #     original_input = torch.cat([original_input, input], dim=2) # [B, 3, H*2, W]
-    #     result = torch.cat([original_input.cpu(), result], dim=3) # [B, 3, H, W*5]
-    #     result_img = tensor2img(result,rgb2bgr=True)
-    #     imwrite(result_img, path, float2int=False)
+        output_img = tensor2img(output,rgb2bgr=True)
+        imwrite(output_img, path, float2int=False)
 
     def Split(self, img):
         '''
@@ -275,8 +197,7 @@ class HighFrequency(SurfaceNetModel):
         self.net_g.eval()
         with torch.no_grad():
             b, c, h, w = self.inputs.shape
-            self.HighFrequency, output = self.net_g(self.inputs)
-            normal, diffuse,roughness,specular = torch.split(output,[2,3,1,3],dim=1)
-            normal = torch_norm(torch.cat([normal, torch.ones((b,1,h,w), device=self.device)], dim=1),dim=1)
-            self.output = torch.cat([normal, diffuse, roughness, specular],dim=1)
+            output = self.net_g(self.inputs)
+            normal = torch_norm(torch.cat([output,torch.ones([b,1,h,w], device=self.device)], dim=1),dim=1)
+            self.output = normal
         self.net_g.train()

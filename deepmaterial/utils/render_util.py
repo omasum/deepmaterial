@@ -337,6 +337,51 @@ class PlanarSVBRDF(BRDF):
         self.brdf = img2tensor(self.split_img(imgs, split_num=num, split_axis=axis, concat=concat,
                                svbrdf_norm=norm), bgr2rgb=False, float32=True, normalization=normalization)
         return self.brdf
+    
+    def get_normals(self, imgs, normalization=False, num=7, axis=1, concat=False, norm=True):
+        self.brdf = img2tensor(self.split_single(imgs, split_num=num, split_axis=axis, concat=concat,
+                               svbrdf_norm=norm), bgr2rgb=False, float32=True, normalization=normalization)
+        return self.brdf # [b, 3, h, w]
+    
+    def split_single(self, imgs, split_num=5, split_axis=1, concat=True, svbrdf_norm=True):
+        """Split input image to $split_num images.
+
+        Args:
+            imgs (list[ndarray] | ndarray): Images with shape (h, w, c). range(0,1)
+            split_num (int): number of input images containing
+            split_axis (int): which axis the split images is concated.
+            svbrdf_norm(bool): if True, process numpy array from (0,1) to (-1,1), and may do gamma_correct
+        Returns:
+            list[ndarray]: Split images.
+        """
+
+        def _norm(img):
+            '''
+                img is a list
+            '''
+            assert len(img) == 7, 'the input is not 7 image'
+            gt, pred, band1, band2, band3, band4, band5 = img
+            result = preprocess(gt)
+            return result # [b,3,h,w]
+
+        if split_num == 1:
+            return imgs
+        else:
+            if isinstance(imgs, list):
+                imglist = [np.split(v, split_num, axis=split_axis) for v in imgs]
+                if svbrdf_norm:
+                    imglist = [_norm(v) for v in imglist]
+                if concat:
+                    return [np.concatenate(v, axis=-1) for v in imglist]
+            else:
+                imglist = np.split(imgs, split_num, axis=split_axis) # len(imglist = 7)
+                if svbrdf_norm:
+                    imglist = _norm(imglist)
+                if concat:
+                    return np.concatenate(imglist, axis=-1)
+                else:
+                    return imglist
+    
 
     def setSVBRDF(self, svbrdf):
         self.brdf = svbrdf
@@ -1414,10 +1459,10 @@ if __name__ == "__main__":
     brdfArgs['size'] = 256
     brdfArgs['order'] = 'pndrs'
     brdfArgs['toLDR'] = True
-    brdfArgs['lampIntensity'] = 1
+    brdfArgs['lampIntensity'] = 12
     import torchvision
     if True:
-        path = '/home/sda/svBRDFs/testBlended/0000010;PolishedMarbleFloor_01Xleather_tiles;3Xdefault.png' # [256, 256*5]indrs
+        path = '/home/sda/svBRDFs/testBlended/0000001;PolishedMarbleFloor_01Xmetal_bumpy_squares;1X1.png' # [256, 256*5]indrs
         # path = '/home/sda/svBRDFs/testBlended/0000033;brick_uneven_stonesXPolishedMarbleFloor_01;2Xdefault.png'
         # path = '/home/sda/svBRDFs/testBlended/0000040;brick_uneven_stonesXleather_tiles;2X0.png'
         svbrdf = PlanarSVBRDF(brdfArgs)
@@ -1436,6 +1481,15 @@ if __name__ == "__main__":
             print('point rendering:', time.time()-start)
             torchvision.utils.save_image(
                 res**0.4545, f'tmp/test-point.png', nrow=1, padding=1, normalize=False)
+        
+        if True:
+            #====================== Point wogamma Rendering test============================
+            renderer = Render(brdfArgs)
+            start = time.time()
+            res = renderer.render(svbrdf, random_light=False)
+            print('point rendering:', time.time()-start)
+            torchvision.utils.save_image(
+                log_normalization(res), f'tmp/wogammatest-point.png', nrow=1, padding=1, normalize=False)
         if True:
             #======================Parallel Rendering test============================
             renderer = Render(brdfArgs)

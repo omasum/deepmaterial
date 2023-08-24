@@ -76,9 +76,12 @@ class BaseModel():
             net = DataParallel(net)
         return net
 
+# add admw
     def get_optimizer(self, optim_type, params, lr, **kwargs):
         if optim_type == 'Adam':
             optimizer = torch.optim.Adam(params, lr, **kwargs)
+        elif optim_type == 'AdamW':
+            optimizer = torch.optim.AdamW(params, lr, **kwargs)
         else:
             raise NotImplementedError(f'optimizer {optim_type} is not supperted yet.')
         return optimizer
@@ -93,6 +96,11 @@ class BaseModel():
         elif scheduler_type == 'CosineAnnealingRestartLR':
             for optimizer in self.optimizers:
                 self.schedulers.append(lr_scheduler.CosineAnnealingRestartLR(optimizer, **train_opt['scheduler']))
+        elif scheduler_type == 'TrueCosineAnnealingLR':
+            print('..', 'cosineannealingLR')
+            for optimizer in self.optimizers:
+                self.schedulers.append(
+                    torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, **train_opt['scheduler']))
         else:
             raise NotImplementedError(f'Scheduler {scheduler_type} is not implemented yet.')
 
@@ -298,7 +306,8 @@ class BaseModel():
         for i, o in enumerate(resume_optimizers):
             self.optimizers[i].load_state_dict(o)
         for i, s in enumerate(resume_schedulers):
-            s['milestones'] = self.schedulers[i].milestones
+            if 'milestones' in s.keys():
+                s['milestones'] = self.schedulers[i].milestones
             self.schedulers[i].load_state_dict(s)
 
     def reduce_loss_dict(self, loss_dict):

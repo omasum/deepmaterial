@@ -21,8 +21,9 @@ class Metrics:
         self.brdf_args = brdf_args
         self.renderer = Render(brdf_args)
         self.light_pos = [0,0,2.14]
-    def __get_svbrdf_parametes(self,path):
+    def __get_svbrdf_parametes(self,path, idx = 0):
         svbrdf = cv2.imread(path)/255
+        svbrdf = np.split(svbrdf, 2, 0)[idx]
         if svbrdf.shape[1] == 1024:
             n, d, r, s = np.split(svbrdf,4,1)
         elif svbrdf.shape[1] == 256*5:
@@ -35,8 +36,9 @@ class Metrics:
         return svs
     def set_light_pos(self, light_pos):
         self.light_pos = light_pos
-    def __get_render(self,path, num=4):
+    def __get_render(self,path, num=4, idx = 0):
         svbrdf_img = cv2.imread(path)[:,:,::-1]/255
+        svbrdf_img = np.split(svbrdf_img, 2, 0)[idx]
         svbrdf = PlanarSVBRDF(self.brdf_args)
         svbrdf.get_svbrdfs(svbrdf_img, num=num)
         render_result = self.renderer.render(svbrdf,light_pos=self.light_pos, colocated=True)
@@ -48,16 +50,16 @@ class Metrics:
         gt_render_results = np.ones([len(gt_path),256,256,3])
         for i,name in enumerate(gt_path):
             path = os.path.join(gt_dir,name)
-            gt_svbrdfs[i] = self.__get_svbrdf_parametes(path)
-            gt_render_results[i] = self.__get_render(path, num=5)
+            gt_svbrdfs[i] = self.__get_svbrdf_parametes(path, idx=0)
+            gt_render_results[i] = self.__get_render(path, num=5, idx = 0)
         pre_path = os.listdir(pre_dir)
         pre_path.sort()
         pre_svbrdfs = np.ones([len(pre_path),4,256,256,3])
         pre_render_results = np.ones([len(pre_path),256,256,3])
         for i,name in enumerate(pre_path):
             path = os.path.join(pre_dir,name)
-            pre_svbrdfs[i] = self.__get_svbrdf_parametes(path)
-            pre_render_results[i] = self.__get_render(path)
+            pre_svbrdfs[i] = self.__get_svbrdf_parametes(path, idx=1)
+            pre_render_results[i] = self.__get_render(path, num=5, idx = 1)
         if self.type == "RMSE":
             rmse_normal,rmse_diffuse,rmse_roughness,rmse_specular = self.__RMSE_svbrdf(gt_svbrdfs,pre_svbrdfs)
             render_rmse = self.__RMSE(gt_render_results,pre_render_results)
@@ -81,3 +83,4 @@ class Metrics:
         mse = np.mean((gt-pre)**2)
         rmse = np.sqrt(mse)
         return rmse
+    

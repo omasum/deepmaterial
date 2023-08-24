@@ -64,6 +64,10 @@ class SurfaceNetModel(BaseModel):
             self.cri_pix = build_loss(train_opt['pixel_opt']).to(self.device)
         else:
             self.cri_pix = None
+        # if train_opt.get('single_opt'):
+        #     self.cri_singlepix = build_loss(train_opt['single_opt']).to(self.device)
+        # else:
+        #     self.cri_singlepix = None
         if train_opt.get('render_opt'):
             self.cri_render = build_loss(train_opt['render_opt']).to(self.device)
         else:
@@ -73,6 +77,22 @@ class SurfaceNetModel(BaseModel):
             self.cri_highfrequency = build_loss(train_opt['highfrequency_opt']).to(self.device)
         else:
             self.cri_highfrequency = None
+        if train_opt.get('noramalpixel_opt'):
+            self.cri_noramalpix = build_loss(train_opt['noramalpixel_opt']).to(self.device)
+        else:
+            self.cri_noramalpix = None
+        if train_opt.get('diffusepixel_opt'):
+            self.cri_diffusepix = build_loss(train_opt['diffusepixel_opt']).to(self.device)
+        else:
+            self.cri_diffusepix = None
+        if train_opt.get('roughnesspixel_opt'):
+            self.cri_roughnesspix = build_loss(train_opt['roughnesspixel_opt']).to(self.device)
+        else:
+            self.cri_roughnesspix = None
+        if train_opt.get('specularpixel_opt'):
+            self.cri_specularpix = build_loss(train_opt['specularpixel_opt']).to(self.device)
+        else:
+            self.cri_specularpix = None
         if train_opt.get('msssim_opt'):
             self.cri_msssim = build_loss(train_opt['msssim_opt']).to(self.device)
         else:
@@ -180,6 +200,13 @@ class SurfaceNetModel(BaseModel):
                 l_pix = self.cri_pix(output, gt)
                 loss_dict['l_pix'] = l_pix
                 l_total += l_pix
+            # if self.cri_singlepix is not None:
+            #     r = torch.cat([roughness]*3, dim=1)
+            #     output = torch.cat([normal, diffuse, r, specular], dim=1)
+            #     gt = torch.cat([self.svbrdf[:,:6], self.svbrdf[:,6:7], self.svbrdf[:,6:7], self.svbrdf[:,6:7], self.svbrdf[:,7:10]], dim=1)
+            #     l_pix = self.cri_pix(output, gt)
+            #     loss_dict['l_pix'] = l_pix
+            #     l_total += l_pix
             if self.cri_msssim is not None:
                 r = torch.cat([roughness]*3, dim=1)
                 ls_n = self.cri_msssim(normal, self.svbrdf[:,0:3])
@@ -200,6 +227,26 @@ class SurfaceNetModel(BaseModel):
                 l_pix = self.cri_highfrequency(self.HFrequency(output), self.gt_h)
                 loss_dict['l_frequencypix'] = l_pix
                 l_total += l_pix
+            if self.cri_noramalpix is not None:
+                output = normal
+                gt = self.svbrdf[:,:3]
+                normal_pix = self.cri_pix(output, gt)
+                loss_dict['normal_pix'] = normal_pix
+            if self.cri_diffusepix is not None:
+                output = diffuse
+                gt = self.svbrdf[:,3:6]
+                diffuse_pix = self.cri_pix(output, gt)
+                loss_dict['diffuse_pix'] = diffuse_pix
+            if self.cri_roughnesspix is not None:
+                output = roughness
+                gt = self.svbrdf[:,6:7]
+                roughness_pix = self.cri_pix(output, gt)
+                loss_dict['roughness_pix'] = roughness_pix
+            if self.cri_specularpix is not None:
+                output = specular
+                gt = self.svbrdf[:,7:10]
+                specular_pix = self.cri_pix(output, gt)
+                loss_dict['specular_pix'] = specular_pix
             return l_total
         else:
             fake_pred = self.net_d(fake_img.detach())    

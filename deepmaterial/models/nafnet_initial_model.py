@@ -15,20 +15,26 @@ from pytorch_wavelets import DWTForward, DWTInverse
 from deepmaterial.metrics.psnr_ssim import ssim
 
 from deepmaterial.utils.wrapper_util import timmer
+
+from deepmaterial.utils.materialmodifier import materialmodifier_L6
+
 metric_module = importlib.import_module('deepmaterial.metrics')
 logger = logging.getLogger('deepmaterial')
 
 
 @MODEL_REGISTRY.register()
-class HighFrequency(SurfaceNetModel):
+class nafnet_initial(SurfaceNetModel):
 
     def __init__(self, opt):
-        super(HighFrequency, self).__init__(opt)     
+        super(nafnet_initial, self).__init__(opt)     
 
     def feed_data(self, data):
         self.svbrdf = data['svbrdfs'].cuda()
         self.inputs = data['inputs'].cuda()
         self.gt_h = self.HFrequencyGT(self.svbrdf)
+        self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands(self.de_gamma((self.inputs + 1.0)/2.0), Logspace=True)
+        self.inputs_bands = self.inputs_bands[:,3:5,:,:]
+        self.inputs = torch.cat([self.inputs, self.inputs_bands], dim=1).cuda() # [B, 7, H, W]
 
     def HFrequencyGT(self, svbrdf):
         '''
@@ -112,8 +118,8 @@ class HighFrequency(SurfaceNetModel):
         self.log_dict = self.reduce_loss_dict(loss_dict)
 
     def computeLoss(self, output, loss_dict, isDesc=False):
-        normal, diffuse,roughness,specular = torch.split(output,[2,3,1,3],dim=1)
-        normal = torch_norm(torch.cat([normal,torch.ones_like(roughness, device=self.device)], dim=1),dim=1)
+        normal, diffuse,roughness,specular = torch.split(output,[3,3,1,3],dim=1)
+        normal = torch_norm(normal,dim=1)
         return self.brdfLoss(normal, diffuse, roughness, specular, loss_dict, isDesc)
     
 
@@ -128,6 +134,8 @@ class HighFrequency(SurfaceNetModel):
         if self.opt.get('pbar',True):
             pbar = tqdm(total=len(dataloader), unit='image')
         for idx, val_data in enumerate(dataloader):
+            if idx == 10:
+                print("os")
             self.feed_data(val_data)           
             self.test()
 
@@ -135,7 +143,8 @@ class HighFrequency(SurfaceNetModel):
                 results = self.get_current_visuals(self.output.cpu(), self.svbrdf.cpu())
                 save_path = osp.join(self.opt['path']['visualization'], dataset_name)
                 if self.opt['is_train'] or self.opt['val'].get('save_gt', False):
-                    brdf_path=osp.join(save_path, f'svbrdf-{current_iter}-{idx}.png')
+                    brdf_path=osp.join(save_path, val_data['name'][0])
+                    # brdf_path=osp.join(save_path, f'svbrdf-{current_iter}-{idx}.png')
                     self.save_visuals(brdf_path, results['predsvbrdf'], results['gtsvbrdf'])
                 else:
                     brdf_path=osp.join(save_path, val_data['name'][0])
@@ -266,7 +275,6 @@ class HighFrequency(SurfaceNetModel):
         return img
 
     def eval_render(self, pred, gt):
-        # rerender = self.renderer.render(pred, n_xy=False, keep_dirs=True, light_dir = torch.tensor([0, 0.3, 1]))
         rerender = self.renderer.render(pred, n_xy=False, keep_dirs=True)
         gtrender = self.renderer.render(gt, n_xy=False, load_dirs=True)
         return rerender, gtrender
@@ -276,7 +284,7 @@ class HighFrequency(SurfaceNetModel):
         with torch.no_grad():
             b, c, h, w = self.inputs.shape
             self.HighFrequency, output = self.net_g(self.inputs)
-            normal, diffuse,roughness,specular = torch.split(output,[2,3,1,3],dim=1)
-            normal = torch_norm(torch.cat([normal, torch.ones((b,1,h,w), device=self.device)], dim=1),dim=1)
+            normal, diffuse,roughness,specular = torch.split(output,[3,3,1,3],dim=1)
+            normal = torch_norm(normal,dim=1)
             self.output = torch.cat([normal, diffuse, roughness, specular],dim=1)
         self.net_g.train()

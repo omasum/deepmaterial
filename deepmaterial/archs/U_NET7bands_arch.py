@@ -13,7 +13,7 @@ from deepmaterial.archs.U_Net import *
 from deepmaterial.utils.materialmodifier import materialmodifier_L6
 
 @ARCH_REGISTRY.register()
-class U_NET(nn.Module):
+class U_NET7bands(nn.Module):
 
     '''
         N_Net arch.
@@ -22,12 +22,12 @@ class U_NET(nn.Module):
     '''
     
     def __init__(self):
-        super(U_NET, self).__init__()
+        super(U_NET7bands, self).__init__()
         # self.unet = UNet(3,12)
-        self.encodern = subEncoder(8, layers = True, bilinear=True)
-        self.encoderd = subEncoder(8, layers = True, bilinear=True)
-        self.encoderr = subEncoder(8, layers = True, bilinear=True)
-        self.encoders = subEncoder(8, layers = True, bilinear=True)
+        self.encodern = subEncoder(7, layers = True, bilinear=True)
+        self.encoderd = subEncoder(7, layers = True, bilinear=True)
+        self.encoderr = subEncoder(7, layers = True, bilinear=True)
+        self.encoders = subEncoder(7, layers = True, bilinear=True)
         self.encoder = subEncoder(3, layers=True, bilinear=True)
         self.decodern = subDecoder(3, 2)
         self.decoderd = subDecoder(3, 3)
@@ -41,6 +41,7 @@ class U_NET(nn.Module):
 
     def forward(self, x):
         self.HighFrequency, self.dec = materialmodifier_L6.Show_subbands((x + 1.0)/2.0, Logspace=True) # [batchsize, 8, H, W]
+        self.HighFrequency = self.HighFrequency[:,0:7,:,:] # [batchsize, 7, H, W]
         _, _, _, self.ncode = self.encodern(self.HighFrequency) # [batchsize, 256, 16, 16]
         _, _, _, self.dcode = self.encoderd(self.HighFrequency) # [batchsize, 256, 16, 16]
         _, _, _, self.rcode = self.encoderr(self.HighFrequency) # [batchsize, 256, 16, 16]
@@ -110,7 +111,7 @@ class U_NET(nn.Module):
 
 
 def test():
-    net = U_NET
+    net = U_NET7bands
     x = torch.randn(2,3,32,32)
     y = net(x)
     print(y.size())

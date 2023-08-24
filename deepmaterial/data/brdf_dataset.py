@@ -573,3 +573,118 @@ class areaDataset(svbrdfDataset):
             np.random.seed(worker_seed)
             random.seed(worker_seed)
         self.init()
+
+@DATASET_REGISTRY.register()
+class predDataset(svbrdfDataset):
+
+    def __init__(self, opt):
+        super().__init__(opt)
+        self.light_mode=self.opt.get('light_mode', 'area')
+        self.input_mode=self.opt.get('input_mode', 'render') # 'folder', 'render', 'image'
+        if not self.opt.get('worker_init', False):
+            self.init()
+
+    def init(self):
+        rendering_folder = self.opt.get('rendering_path', None)
+        if self.input_mode == 'render':
+            if self.light_mode == 'area':
+                self.light_config = self.opt.get('light_args', {'type':'RectLighting'})
+                self.light_config.update(self.opt['brdf_args'])
+                tex = self.light_config.get('texture', '')
+                if isinstance(tex, list):
+                    self.lighting = []
+                    self.texture = []
+                    config = deepcopy(self.light_config)
+                    for t in tex:
+                        config['texture'] = t
+                        lighting = RectLighting(config)
+                        self.lighting.append(lighting)
+                        lh, lw = lighting.tex.shape[-2:]
+                        self.texture.append(imresize(lighting.tex,scale=256/lh))
+                    self.renderer = PolyRender(self.opt['brdf_args'])
+                else:
+                    self.lighting = RectLighting(self.light_config)
+                    self.renderer = PolyRender(self.opt['brdf_args'], lighting=self.lighting)
+                    lh, lw = self.renderer.lighting.tex.shape[-2:]
+                    self.texture = imresize(self.renderer.lighting.tex,scale=256/lh)
+        
+            elif self.light_mode == 'parallel':
+                self.renderer = Render(self.opt['brdf_args'])
+                self.light_dir = self.opt['brdf_args']['lightdir']
+        elif self.input_mode == 'folder':
+            if self.opt['phase'] == 'train':
+                input_folder = os.path.join(rendering_folder, 'train-'+self.light_mode+'Lighting-large')
+            else:
+                input_folder = os.path.join(rendering_folder, 'test-'+self.light_mode+'Lighting-large')
+            self.input_path = sorted(paths_from_folder(input_folder))
+        else:
+            self.input_path = None
+        self.data_paths = self.data_paths
+
+    def __getitem__(self, index):
+        img_path = self.data_paths[index]
+        img_bytes = self.file_client.get(img_path, 'brdf')
+        svbrdf_img = imfrombytes(img_bytes, float32=True, bgr2rgb=True) # original iamges/255: 0-1 [b,c,h,w], numpy.array
+        pattern = {}
+        h,w,c = svbrdf_img.shape
+        # svbrdf_img = imresize(svbrdf_img, scale = 256/288) # 2080ti
+        svbrdfs = self.svbrdf.get_normals(svbrdf_img) # [b,3,h,w]
+        svbrdfs = torch.clip(svbrdfs, -1.0, 1.0)
+        # svbrdfs = self.svBRDF_utils.unsqueeze_brdf(svbrdfs, n_xy=False, r_single=True)
+        if self.input_mode == 'folder':
+            input_path = self.input_path[index]
+            img_bytes = self.file_client.get(input_path, 'brdf')
+            inputs_img = imfrombytes(img_bytes, float32=False, bgr2rgb=False)
+            inputs_img = img2tensor(inputs_img, bgr2rgb=True, float32=True, normalization=True)
+        elif self.input_mode == 'image':
+            inputs_img = img2tensor(svbrdf_img[:h, h:2*h], bgr2rgb=False)
+            inputs = torch.clip(inputs_img, 0.0, 1.0)
+        else:
+            if self.light_mode == 'area':
+                if isinstance(self.lighting, list):
+                    inputs = []
+                    lightingInputs = []
+                    for i, lighting in enumerate(self.lighting):
+                        self.renderer.lighting = lighting
+                        tmpLight = self.texture[i]
+                        lightingInputs.append(tmpLight)
+                        inputs.append(self.renderer.render(svbrdf=svbrdfs))
+                    inputs_img = torch.stack(inputs, dim=0) ** 0.4545
+                    inputs.extend(lightingInputs)
+                    inputs = torch.cat(inputs, dim=-3)
+                else:
+                    inputs = self.renderer.render(svbrdf=svbrdfs)
+                    inputs_img = inputs ** 0.4545
+                    if self.opt.get('catTex', False):
+                        inputs = torch.cat([inputs, self.texture], dim=-3)
+                    pattern['pattern'] = self.renderer.lighting.tex*2-1
+            else:
+                if self.light_mode == 'point':
+                    inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False)
+                    inputs_img = inputs ** 0.4545
+                else: # parallel
+                    inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False, light_dir = torch.tensor(self.light_dir)) # no gamma
+                    inputs_img = inputs ** 0.4545
+                
+        if not self.opt.get('gamma', True):
+            inputs = inputs ** 0.4545
+
+        if self.opt.get('log', False):
+            inputs = log_normalization(inputs)
+        inputs = preprocess(inputs)
+        result = {
+            'inputs': inputs, # input of net, with gamma
+            'imgs': inputs_img, # show, with gamma
+            'svbrdfs': svbrdfs,
+            'name': os.path.basename(img_path)
+        }
+        result.update(pattern)
+        return result
+    
+    def worker_init_fn(self, worker_id, num_workers=1, rank=1, seed=1, fix_seed=False):
+        if fix_seed:
+            # Set the worker seed to num_workers * rank + worker_id + seed
+            worker_seed = num_workers * rank + worker_id + seed
+            np.random.seed(worker_seed)
+            random.seed(worker_seed)
+        self.init()

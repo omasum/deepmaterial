@@ -13,7 +13,7 @@ from deepmaterial.archs.U_Net import *
 from deepmaterial.utils.materialmodifier import materialmodifier_L6
 
 @ARCH_REGISTRY.register()
-class U_NET(nn.Module):
+class U_NETHF(nn.Module):
 
     '''
         N_Net arch.
@@ -22,7 +22,7 @@ class U_NET(nn.Module):
     '''
     
     def __init__(self):
-        super(U_NET, self).__init__()
+        super(U_NETHF, self).__init__()
         # self.unet = UNet(3,12)
         self.encodern = subEncoder(8, layers = True, bilinear=True)
         self.encoderd = subEncoder(8, layers = True, bilinear=True)
@@ -110,7 +110,7 @@ class U_NET(nn.Module):
 
 
 def test():
-    net = U_NET
+    net = U_NETHF
     x = torch.randn(2,3,32,32)
     y = net(x)
     print(y.size())

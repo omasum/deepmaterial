@@ -1,5 +1,5 @@
 # general settings
-name: pointUNETwoHFL1Loss  # initialization
+name: pointUNETL1Loss_concat  # initialization
 
 model_type: HighFrequency
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -15,13 +15,15 @@ datasets:
       size: 256
       order: pndrs
       toLDR: True
+      # lampIntensity: 1
+      # lightdir: [0, 0.3, 1]
     data_path: /home/sda/svBRDFs/trainBlended # Ruby
     # data_path: /home/xh/cjm/18single_image/Data_Deschaintre18/trainBlended # 2080Ti
     # rendering_path: /home/sda/svBRDFs/
     light_mode: point
     input_mode: image
     log: False
-    gamma: False
+    gamma: True
     io_backend: 
       type: disk
     # data loader
@@ -45,7 +47,7 @@ datasets:
     # data_path: /home/xh/cjm/18single_image/Data_Deschaintre18/testBlended # 2080Ti
     # rendering_path: /home/sda/svBRDFs/
     log: False
-    gamma: False
+    gamma: True
     light_mode: point
     input_mode: image
     io_backend: 
@@ -54,13 +56,14 @@ datasets:
 
 # network structures
 network_g:
-  type: U_NETwoHF
+  type: U_NETconcat
   brdf_args:
     nbRendering: 1
     size: 256
     order: pndrs
     toLDR: True
     # lampIntensity: 1
+    # lightdir: [0, 0.3, 1]
     lampIntensity: 12
 
 # network_d:
@@ -69,13 +72,13 @@ network_g:
 path:
   # pretrain_network_g: ~
   strict_load_g: true
-  # resume_state: experiments/001_UNETwoHF/training_states/280000.state
+  # resume_state: experiments/pointUNETreweight/training_states/150000.state
 
 # training settings
 train:
   optim_g:
     type: Adam
-    lr: !!float 1e-5
+    lr: !!float 2e-5
     weight_decay: 0
     betas: [0.5, 0.999]
   scheduler:
@@ -132,5 +135,5 @@ val:
 # logging settings
 logger:
   print_freq: 1000
-  save_checkpoint_freq: !!float 2e4
+  save_checkpoint_freq: !!float 5e4
   use_tb_logger: true
