@@ -103,7 +103,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-opt",
-                "options/train/NAFNet/nafnetL1lossB4.yml"
+                "options/train/NAFNet/nafnetL1loss.yml"
             ]
         },
         {

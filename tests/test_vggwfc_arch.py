@@ -1,17 +1,17 @@
 from torchsummary import summary
-from deepmaterial.archs.NAFNet_arch import NAFSDNet, NAFNet
+from deepmaterial.archs.NAFNet_arch import NAFSDNet, NAFNet, NAFNSDNet
 
 width=32
 enc_blk_nums=[2, 2, 4, 8]
 middle_blk_num=12
 dec_blk_nums=[2, 2, 2, 2]
 
-anet = NAFNet(width=width, middle_blk_num=middle_blk_num, enc_blk_nums=enc_blk_nums, dec_blk_nums=dec_blk_nums).to('cuda')
+anet = NAFNSDNet(width=width, middle_blk_num=middle_blk_num, enc_blk_nums=enc_blk_nums, dec_blk_nums=dec_blk_nums).to('cuda')
 summary(anet, (5,256,256),8)
 
-myNet = NAFSDNet(width=width, middle_blk_num=middle_blk_num, enc_blk_nums=enc_blk_nums, dec_blk_nums=dec_blk_nums)
-myNet = myNet.to('cuda')
-summary(myNet,(5,256,256),8)
+# myNet = NAFSDNet(width=width, middle_blk_num=middle_blk_num, enc_blk_nums=enc_blk_nums, dec_blk_nums=dec_blk_nums)
+# myNet = myNet.to('cuda')
+# summary(myNet,(5,256,256),8)
 
 # from deepmaterial.archs.NAFNet_arch import NAFNet
 # import torch

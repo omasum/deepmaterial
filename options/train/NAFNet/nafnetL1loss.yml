@@ -1,7 +1,7 @@
 # general settings
-name: NAFNetL1Loss_1  # initialization
+name: NAFNetL1Loss_45_NSD  # initialization
 
-model_type: nafnet0
+model_type: nafnet
 num_gpu: 1  # set num_gpu: 0 for cpu mode
 manual_seed: 10
 
@@ -54,7 +54,7 @@ datasets:
 
 # network structures
 network_g:
-  type: NAFNet
+  type: NAFNSDNet
   width: 32
   enc_blk_nums: [2, 2, 4, 8]
   middle_blk_num: 12
@@ -88,14 +88,14 @@ train:
     eta_min: !!float 1e-7
     # milestones: [1,5,10,15]
   # total_iter: 60000
-  total_iter: 20000
+  total_iter: 300000
   warmup_iter: -1  # no warm up
 
   # losses
-  # highfrequency_opt:
-  #   type: L1Loss
-  #   loss_weight: 0.01
-  #   reduction: mean
+  highfrequency_opt:
+    type: L1Loss
+    loss_weight: 0.01
+    reduction: mean
   pixel_opt:
     type: L1Loss
     loss_weight: 1

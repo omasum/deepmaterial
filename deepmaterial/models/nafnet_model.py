@@ -23,18 +23,17 @@ logger = logging.getLogger('deepmaterial')
 
 
 @MODEL_REGISTRY.register()
-class nafnet0(SurfaceNetModel):
+class nafnet(SurfaceNetModel):
 
     def __init__(self, opt):
-        super(nafnet0, self).__init__(opt)     
+        super(nafnet, self).__init__(opt)     
 
     def feed_data(self, data):
         self.svbrdf = data['svbrdfs'].cuda()
-        self.svbrdf[:,0:7,:,:] = -1.0
         self.inputs = data['inputs'].cuda()
         self.gt_h = self.HFrequencyGT(self.svbrdf)
         self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands(self.de_gamma((self.inputs + 1.0)/2.0), Logspace=True)
-        self.inputs_bands = self.inputs_bands[:,0:1,:,:]
+        self.inputs_bands = self.inputs_bands[:,3:5,:,:]
         self.inputs = torch.cat([self.inputs, self.inputs_bands], dim=1).cuda() # [B, 7, H, W]
 
     def HFrequencyGT(self, svbrdf):
@@ -101,6 +100,7 @@ class nafnet0(SurfaceNetModel):
         
         self.optimizer_g.zero_grad()
         self.HighFrequency, output = self.net_g(self.inputs)
+        # self.HighFrequency = self.HFrequencyGT(output)
         l_total = self.computeLoss(output, loss_dict)
         l_total.backward()
         self.optimizer_g.step()
