@@ -8,7 +8,7 @@ if __name__ =='__main__':
     result_root='results'
     surffix = 'visualization/areaDataset'
     metrics = Metrics("RMSE")
-    explist = ['19data_pointRADNL1Loss']
+    explist = ['pointNaf45L1Loss_SD']
     for exp in explist:
         metrics.svbrdfs_from_dir(os.path.join(result_root, exp, surffix),os.path.join(result_root, exp, surffix), exp_name=exp)
     print("cost time: %.2f seconds"%(time.time()-starttime))

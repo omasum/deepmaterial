@@ -23,17 +23,18 @@ logger = logging.getLogger('deepmaterial')
 
 
 @MODEL_REGISTRY.register()
-class nafnet_initial(SurfaceNetModel):
+class nafnet0(SurfaceNetModel):
 
     def __init__(self, opt):
-        super(nafnet_initial, self).__init__(opt)     
+        super(nafnet0, self).__init__(opt)     
 
     def feed_data(self, data):
         self.svbrdf = data['svbrdfs'].cuda()
+        self.svbrdf[:,0:7,:,:] = -1.0
         self.inputs = data['inputs'].cuda()
         self.gt_h = self.HFrequencyGT(self.svbrdf)
         self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands(self.de_gamma((self.inputs + 1.0)/2.0), Logspace=True)
-        self.inputs_bands = self.inputs_bands[:,3:5,:,:]
+        self.inputs_bands = self.inputs_bands[:,0:1,:,:]
         self.inputs = torch.cat([self.inputs, self.inputs_bands], dim=1).cuda() # [B, 7, H, W]
 
     def HFrequencyGT(self, svbrdf):
@@ -134,8 +135,6 @@ class nafnet_initial(SurfaceNetModel):
         if self.opt.get('pbar',True):
             pbar = tqdm(total=len(dataloader), unit='image')
         for idx, val_data in enumerate(dataloader):
-            # if idx == 10:
-            #     print("os")
             self.feed_data(val_data)           
             self.test()
 
@@ -143,8 +142,7 @@ class nafnet_initial(SurfaceNetModel):
                 results = self.get_current_visuals(self.output.cpu(), self.svbrdf.cpu())
                 save_path = osp.join(self.opt['path']['visualization'], dataset_name)
                 if self.opt['is_train'] or self.opt['val'].get('save_gt', False):
-                    brdf_path=osp.join(save_path, val_data['name'][0])
-                    # brdf_path=osp.join(save_path, f'svbrdf-{current_iter}-{idx}.png')
+                    brdf_path=osp.join(save_path, f'svbrdf-{current_iter}-{idx}.png')
                     self.save_visuals(brdf_path, results['predsvbrdf'], results['gtsvbrdf'])
                 else:
                     brdf_path=osp.join(save_path, val_data['name'][0])
