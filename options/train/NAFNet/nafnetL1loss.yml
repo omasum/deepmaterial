@@ -1,5 +1,5 @@
 # general settings
-name: NAFNetL1Loss_45_NSD  # initialization
+name: Render_NAFNetL1Loss_45_NSD  # initialization
 
 model_type: nafnet
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -15,11 +15,12 @@ datasets:
       size: 256
       order: pndrs
       toLDR: True
+      lampIntensity: 12
     data_path: /home/sda/svBRDFs/trainBlended # Ruby
     # data_path: /home/xh/cjm/18single_image/Data_Deschaintre18/trainBlended # 2080Ti
     # rendering_path: /home/sda/svBRDFs/
     light_mode: point
-    input_mode: image
+    input_mode: render
     log: False
     gamma: False
     io_backend: 
@@ -40,6 +41,7 @@ datasets:
       size: 256
       order: pndrs
       toLDR: True
+      lampIntensity: 12
     data_path: /home/sda/svBRDFs/testBlended # Ruby
     # data_path: /home/xh/cjm/18single_image/Data_Deschaintre18/trainBlended # 2080Ti
     # data_path: /home/xh/cjm/18single_image/Data_Deschaintre18/testBlended # 2080Ti
@@ -47,7 +49,7 @@ datasets:
     log: False
     gamma: False
     light_mode: point
-    input_mode: image
+    input_mode: render
     io_backend: 
       type: disk
     len: 18
@@ -92,10 +94,10 @@ train:
   warmup_iter: -1  # no warm up
 
   # losses
-  highfrequency_opt:
-    type: L1Loss
-    loss_weight: 0.01
-    reduction: mean
+  # highfrequency_opt:
+  #   type: L1Loss
+  #   loss_weight: 0.01
+  #   reduction: mean
   pixel_opt:
     type: L1Loss
     loss_weight: 1

@@ -1489,7 +1489,7 @@ if __name__ == "__main__":
             res = renderer.render(svbrdf, random_light=False)
             print('point rendering:', time.time()-start)
             torchvision.utils.save_image(
-                log_normalization(res), f'tmp/wogammatest-point.png', nrow=1, padding=1, normalize=False)
+                res, f'tmp/wogammatest-point.png', nrow=1, padding=1, normalize=False)
         if True:
             #======================Parallel Rendering test============================
             renderer = Render(brdfArgs)

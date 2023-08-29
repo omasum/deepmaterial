@@ -496,6 +496,8 @@ class areaDataset(svbrdfDataset):
             elif self.light_mode == 'parallel':
                 self.renderer = Render(self.opt['brdf_args'])
                 self.light_dir = self.opt['brdf_args']['lightdir']
+            elif self.light_mode == 'point':
+                self.renderer = Render(self.opt['brdf_args'])
         elif self.input_mode == 'folder':
             if self.opt['phase'] == 'train':
                 input_folder = os.path.join(rendering_folder, 'train-'+self.light_mode+'Lighting-large')
@@ -545,7 +547,7 @@ class areaDataset(svbrdfDataset):
                     pattern['pattern'] = self.renderer.lighting.tex*2-1
             else:
                 if self.light_mode == 'point':
-                    inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False)
+                    inputs = self.renderer.render(svbrdf=svbrdfs, random_light=True)
                     inputs_img = inputs ** 0.4545
                 else: # parallel
                     inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False, light_dir = torch.tensor(self.light_dir)) # no gamma

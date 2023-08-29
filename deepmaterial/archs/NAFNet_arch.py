@@ -205,7 +205,7 @@ class NAFBlock(nn.Module):
 @ARCH_REGISTRY.register()
 class NAFNet(nn.Module):
 
-    def __init__(self, in_channel=4, out_channel=10, width=16, middle_blk_num=1, enc_blk_nums=[], dec_blk_nums=[], res=False, tanh=True, **kwargs):
+    def __init__(self, in_channel=3, out_channel=10, width=16, middle_blk_num=1, enc_blk_nums=[], dec_blk_nums=[], res=False, tanh=True, **kwargs):
         super().__init__()
 
         self.res = res

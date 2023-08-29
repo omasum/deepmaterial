@@ -118,17 +118,6 @@
             ]
         },
         {
-            "name": "NAFNet_train",
-            "type": "python",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "args": [
-                "-opt",
-                "options/train/Nafnet/nafnetL1Loss.yml"
-            ]
-        },
-        {
             "name": "vw_train",
             "type": "python",
             "request": "launch",

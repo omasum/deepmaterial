@@ -34,7 +34,7 @@ class nafnet(SurfaceNetModel):
         self.gt_h = self.HFrequencyGT(self.svbrdf)
         self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands(self.de_gamma((self.inputs + 1.0)/2.0), Logspace=True)
         self.inputs_bands = self.inputs_bands[:,3:5,:,:]
-        self.inputs = torch.cat([self.inputs, self.inputs_bands], dim=1).cuda() # [B, 7, H, W]
+        self.inputs = torch.cat([self.inputs, self.inputs_bands], dim=1).cuda() # [B, 5, H, W]
 
     def HFrequencyGT(self, svbrdf):
         '''
@@ -191,6 +191,36 @@ class nafnet(SurfaceNetModel):
             self._log_validation_metric_values(current_iter, dataset_name,
                                                 tb_logger)
     
+    def save_visuals(self, path, pred, gt):
+        input = (self.inputs[:,0:3]*0.5+0.5).cpu()
+        b,c,h,w = input.shape
+        black = torch.zeros(b,c,h,w)
+        input_add = torch.cat([input, black], dim=2)
+        output = torch.cat([gt,pred],dim=2)*0.5+0.5
+        normal, diffuse, roughness, specular = torch.split(output,[3,3,1,3],dim=1)
+        roughness = torch.tile(roughness,[1,3,1,1])
+        output = torch.cat([normal,diffuse,roughness,specular],dim=-1)
+        
+        renderer, gtrender = self.eval_render(pred, gt)
+        render = torch.split(torch.cat([gtrender,renderer],dim=-2),[1]*self.renderer.nbRendering, dim=-4)
+        render = torch.cat(render, dim=-1).squeeze(1)
+
+        output = torch.cat([render**0.4545, output], dim=-1)
+
+        output = torch.cat([input_add, output], dim=3)
+
+        output_img = tensor2img(output,rgb2bgr=True)
+        imwrite(output_img, path, float2int=False)
+
+    def save_svbrdfs(self, path, pred):
+        
+        output = pred*0.5+0.5 # [b, 10, h, w]
+        normal, diffuse, roughness, specular = torch.split(output,[3,3,1,3],dim=1)
+        roughness = torch.tile(roughness,[1,3,1,1])
+        output = torch.cat([normal,diffuse,roughness,specular],dim=-1) # [b, 3, h, 4*w]
+        output_img = tensor2img(output,rgb2bgr=True)
+        imwrite(output_img, path, float2int=False)
+
     def SplitFrequency(self, Frequency):
         '''
 
