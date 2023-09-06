@@ -32,9 +32,9 @@ class nafnet(SurfaceNetModel):
         self.svbrdf = data['svbrdfs'].cuda()
         self.inputs = data['inputs'].cuda()
         self.gt_h = self.HFrequencyGT(self.svbrdf)
-        self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands(self.de_gamma((self.inputs + 1.0)/2.0), Logspace=True)
-        self.inputs_bands = self.inputs_bands[:,3:5,:,:]
-        self.inputs = torch.cat([self.inputs, self.inputs_bands], dim=1).cuda() # [B, 5, H, W]
+        # self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands(self.de_gamma((self.inputs + 1.0)/2.0), Logspace=True)
+        # self.inputs_bands = self.inputs_bands[:,0:7,:,:]
+        # self.inputs = torch.cat([self.inputs, self.inputs_bands], dim=1).cuda() # [B, 5, H, W]
 
     def HFrequencyGT(self, svbrdf):
         '''
@@ -303,8 +303,8 @@ class nafnet(SurfaceNetModel):
         return img
 
     def eval_render(self, pred, gt):
-        rerender = self.renderer.render(pred, n_xy=False, keep_dirs=True)
-        gtrender = self.renderer.render(gt, n_xy=False, load_dirs=True)
+        rerender = self.renderer.render(pred, n_xy=False, keep_dirs=True, colocated=True)
+        gtrender = self.renderer.render(gt, n_xy=False, load_dirs=True, colocated=True)
         return rerender, gtrender
     
     def test(self):

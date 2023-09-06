@@ -14,6 +14,7 @@ from deepmaterial.utils.wrapper_util import timmer
 import nvdiffrast.torch as dr
 
 lightDistance = 2.14
+# lightDistance = 1.14
 viewDistance = 5  # 44 degrees FOV 
 
 
@@ -1477,7 +1478,7 @@ if __name__ == "__main__":
             #====================== Rendering test============================
             renderer = Render(brdfArgs)
             start = time.time()
-            res = renderer.render(svbrdf, random_light=False)
+            res = renderer.render(svbrdf, random_light=False, colocated=True)
             print('point rendering:', time.time()-start)
             torchvision.utils.save_image(
                 res**0.4545, f'tmp/test-point.png', nrow=1, padding=1, normalize=False)
@@ -1486,7 +1487,7 @@ if __name__ == "__main__":
             #====================== Point wogamma Rendering test============================
             renderer = Render(brdfArgs)
             start = time.time()
-            res = renderer.render(svbrdf, random_light=False)
+            res = renderer.render(svbrdf, random_light=False, colocated=True)
             print('point rendering:', time.time()-start)
             torchvision.utils.save_image(
                 res, f'tmp/wogammatest-point.png', nrow=1, padding=1, normalize=False)
