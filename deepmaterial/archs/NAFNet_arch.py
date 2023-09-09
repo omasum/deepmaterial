@@ -996,7 +996,7 @@ class NAFNetHF(nn.Module):
         else:
             self.intro = nn.Conv2d(in_channels=in_channel, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
                               bias=True)
-            self.intro2 = nn.Conv2d(in_channels=in_channel-1, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
+            self.intro2 = nn.Conv2d(in_channels=7, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
                               bias=True)
         self.encoders, self.middle_blks, self.downs, width = self.build_encoders(width, enc_blk_nums, middle_blk_num)
         width = width//2
@@ -1071,7 +1071,7 @@ class NAFNetHF(nn.Module):
         B, C, H, W = inp.shape # inp range
         self.HighFrequency = torch.ones(B, C, int(H/2), int(W/2))
         self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands(self.de_gamma((inp + 1.0)/2.0), Logspace=True)
-        self.inputs_bands = self.inputs_bands[:,3:5,:,:]
+        self.inputs_bands = self.inputs_bands[:,0:7,:,:]
         input_bands = self.inputs_bands
 
         input_bands = self.check_image_size(input_bands)

@@ -260,7 +260,8 @@ def train_pipeline(root_path):
 
 if __name__ == '__main__':
     root_path = osp.abspath(osp.join(__file__, osp.pardir, osp.pardir))
-    root_path = "/home/cjm/DeepMaterial"
+    # root_path = "/home/cjm/DeepMaterial"
+    root_path = "/home/sda/cjm/deepmaterial"
     train_pipeline(root_path)
 
 
