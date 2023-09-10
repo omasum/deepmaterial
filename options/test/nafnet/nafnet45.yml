@@ -1,5 +1,5 @@
 # general settings
-name: pointNaf45L1Loss_2  # initialization
+name: pointNafallbands_splitHF_svbrdf  # initialization
 
 model_type: nafnet
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -47,15 +47,15 @@ network_g:
 #   type: PatchDiscriminator
 # path
 path:
-  pretrain_network_g: experiments/NAFNetL1Loss_2_45/models/net_g_latest.pth
+  pretrain_network_g: /home/sda/cjm/deepmaterial/experiments/NAFNetL1Loss_allbands_splitHF/models/net_g_latest.pth
   strict_load_g: true
   # resume_state: experiments/001_SurfaceNet/training_states/609.state
 
 # validation settings
 val:
   save_img: True
-  # save_gt: False
-  save_gt: True
+  save_gt: False
+  # save_gt: True
 
   metrics:
     # cosine: # metric name, can be arbitrary

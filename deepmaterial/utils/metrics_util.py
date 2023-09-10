@@ -54,8 +54,8 @@ class Metrics:
         for i,name in enumerate(gt_path):
             path = os.path.join(gt_dir,name)
             gt_svbrdfs[i] = self.__get_svbrdf_parametes(path, idx=0)
-            # gt_render_results[i] = self.__get_render(path, num=5, idx = 0)
-            gt_render_results[i] = self.__get_render(path, num=6, idx = 0)
+            gt_render_results[i] = self.__get_render(path, num=5, idx = 0)
+            # gt_render_results[i] = self.__get_render(path, num=6, idx = 0)
         pre_path = os.listdir(pre_dir)
         pre_path.sort()
         pre_svbrdfs = np.ones([len(pre_path),4,256,256,3])
@@ -63,8 +63,8 @@ class Metrics:
         for i,name in enumerate(pre_path):
             path = os.path.join(pre_dir,name)
             pre_svbrdfs[i] = self.__get_svbrdf_parametes(path, idx=1)
-            # pre_render_results[i] = self.__get_render(path, num=5, idx = 1)
-            pre_render_results[i] = self.__get_render(path, num=6, idx = 1)
+            pre_render_results[i] = self.__get_render(path, num=5, idx = 1)
+            # pre_render_results[i] = self.__get_render(path, num=6, idx = 1)
         if self.type == "RMSE":
             rmse_normal,rmse_diffuse,rmse_roughness,rmse_specular = self.__RMSE_svbrdf(gt_svbrdfs,pre_svbrdfs)
             render_rmse = self.__RMSE(gt_render_results,pre_render_results)

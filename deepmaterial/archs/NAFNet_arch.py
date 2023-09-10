@@ -1120,6 +1120,176 @@ class NAFNetHF(nn.Module):
         return x
 
 @ARCH_REGISTRY.register()
+class NAFNetHFPick(nn.Module):
+
+    def __init__(self, in_channel=3, out_channel=10, width=16, middle_blk_num=1, enc_blk_nums=[], dec_blk_nums=[], res=False, tanh=True, **kwargs):
+        super().__init__()
+
+        self.res = res
+        self.tanh = nn.Tanh() if tanh else tanh
+        self.usePattern = kwargs.get('usePattern', False)
+        if self.usePattern:
+            self.intro = nn.Conv2d(in_channels=in_channel, out_channels=int(width*3/4), kernel_size=3, padding=1, stride=1, groups=1,
+                              bias=True)
+            self.introPattern = self.build_intropattern(int(width/4))
+        else:
+            self.intro = nn.Conv2d(in_channels=in_channel, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
+                              bias=True)
+            self.intro2 = nn.Conv2d(in_channels=7, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
+                              bias=True)
+        self.encoders, self.middle_blks, self.downs, width = self.build_encoders(width, enc_blk_nums, middle_blk_num)
+        width = width//2
+        self.ups, self.decoders, self.padder_size, width = self.build_decoders(width, dec_blk_nums)
+        self.ending = nn.Conv2d(in_channels=width, out_channels=out_channel, kernel_size=3, padding=1, stride=1, groups=1,
+                              bias=True)
+        self.sigmoid = nn.Sigmoid()
+        self.weightencoder = self._make_layers(cfg['VGG11'])
+        self.classifier = self.Classifier(512*8*8, 7)
+
+    def build_intropattern(self, width):
+        introPattern = []
+        introPattern.append(nn.Conv2d(in_channels=3, out_channels=width, kernel_size=2, stride=2))
+        introPattern.append(NAFBlock(width))
+        introPattern.append(nn.Conv2d(in_channels=width, out_channels=width, kernel_size=2, stride=2))
+        introPattern.append(NAFBlock(width))
+        return nn.Sequential(*introPattern)
+
+    def de_gamma(self,img):
+        image = img**2.2
+        image = torch.clip(image, min=0.0, max=1.0)
+        return image
+
+    def Classifier(self,in_chnnel,out_chnnel):
+        layers = []
+        layers += [nn.Linear(in_chnnel,out_chnnel)]
+        layers += [nn.Sigmoid()] # output weight must in (0,1)
+        return nn.Sequential(*layers)
+    
+    def _make_layers(self, cfg):
+        layers = []
+        in_channels = 3
+        for x in cfg:
+            if x == 'M':
+                layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+            else:
+                layers += [nn.Conv2d(in_channels, x, kernel_size=3, padding=1),
+                           nn.BatchNorm2d(x),
+                           nn.ReLU(inplace=True)]
+                in_channels = x
+        layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
+        return nn.Sequential(*layers)
+
+    def build_encoders(self, width, enc_blk_nums, middle_blk_num):
+        encoders = nn.ModuleList()
+        downs = nn.ModuleList()
+        for num in enc_blk_nums:
+            encoders.append(
+                nn.Sequential(
+                    *[NAFBlock(width) for _ in range(num)]
+                )
+            )
+            downs.append(
+                nn.Conv2d(width, 2*width, 2, 2)
+            )
+            width = width * 2
+        width = width * 2 # two branch cat
+        middle_blks = \
+            nn.Sequential(
+                *[NAFBlock(width) for _ in range(middle_blk_num)],
+                nn.Conv2d(width, width//2, 1, bias=False)
+            )
+        return encoders, middle_blks, downs, width
+
+    def up(self, width):
+        ups = nn.ModuleList()
+        ups.append(
+                nn.Sequential(
+                    nn.Conv2d(width, width // 2, 1, bias=False)
+                )
+        )
+        return ups
+
+    def build_decoders(self, width, dec_blk_nums):
+        ups = nn.ModuleList()
+        decoders = nn.ModuleList()
+        for num in dec_blk_nums:
+            ups.append(
+                nn.Sequential(
+                    nn.Conv2d(width, width * 2, 1, bias=False),
+                    nn.PixelShuffle(2)
+                )
+            )
+            width = width // 2
+            decoders.append(
+                nn.Sequential(
+                    *[NAFBlock(width) for _ in range(num)]
+                )
+            )
+
+        padder_size = 2 ** len(self.encoders)
+        return ups, decoders, padder_size, width
+
+    def forward(self, inp, pattern=None):
+        B, C, H, W = inp.shape # inp range
+        self.HighFrequency = torch.ones(B, C, int(H/2), int(W/2))
+        self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands(self.de_gamma((inp + 1.0)/2.0), Logspace=True)
+        self.inputs_bands = self.inputs_bands[:,0:7,:,:]
+
+        feature = self.weightencoder(inp)
+        feature = feature.view(B, -1) # [B, 512*8*8]
+        feature_mask = self.classifier(feature) # [B,7]
+        feature_mask_mean = torch.mean(feature_mask, dim=1, keepdim=True) # [B,1]
+        self.feature_mask = torch.where(feature_mask >= feature_mask_mean, torch.ones_like(feature_mask), torch.zeros_like(feature_mask)) # [B,7]
+        feature_mask = self.feature_mask.unsqueeze(-1).unsqueeze(-1) # [B, 7, 1, 1]
+        
+        self.masked_HF = self.inputs_bands * feature_mask
+
+        input_bands = self.check_image_size(self.masked_HF)
+        inp = self.check_image_size(inp)
+
+        x2 = self.intro2(input_bands)
+        x = self.intro(inp)
+
+        if self.usePattern:
+            featPattern = self.introPattern(pattern)
+            x = torch.cat([x, featPattern.broadcast_to(B,featPattern.shape[1], H, W)], dim = 1)
+        
+        encs = []
+        encs2 = []
+
+        for encoder, down in zip(self.encoders, self.downs):
+            x2 = encoder(x2)
+            encs2.append(x2)
+            x2 = down(x2)
+        for encoder, down in zip(self.encoders, self.downs):
+            x = encoder(x)
+            encs.append(x)
+            x = down(x)
+
+        x = self.middle_blks(torch.cat([x, x2], dim=1)) # [1024]->512
+
+        for decoder, up, enc_skip in zip(self.decoders, self.ups, encs[::-1]):
+            x = up(x) # 256
+            x = x + enc_skip
+            x = decoder(x)
+
+        x = self.ending(x)
+        if self.res:
+            x = x + inp
+        if self.tanh:
+            x = self.tanh(x)
+        else:
+            x = x.clamp(-1+1e-6, 1-1e-6)
+        return self.HighFrequency, x[:, :, :H, :W]
+
+    def check_image_size(self, x):
+        _, _, h, w = x.size()
+        mod_pad_h = (self.padder_size - h % self.padder_size) % self.padder_size
+        mod_pad_w = (self.padder_size - w % self.padder_size) % self.padder_size
+        x = F.pad(x, (0, mod_pad_w, 0, mod_pad_h))
+        return x
+
+@ARCH_REGISTRY.register()
 class MaterialNAFNet(NAFNet):
     def __init__(self, in_channel=3, width=16, middle_blk_num=1, enc_blk_nums=[], dec_blk_nums=[], res=False, tanh=True, **kwargs):
         super(NAFNet, self).__init__()
