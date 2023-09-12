@@ -191,7 +191,7 @@
             "console": "integratedTerminal",
             "args": [
                 "-opt",
-                "options/test/nafnet/nafnet45.yml"
+                "options/test/nafnet/nafnet45_real.yml"
             ]
         },
         {

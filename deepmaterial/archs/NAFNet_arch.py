@@ -998,7 +998,8 @@ class NAFNetHF(nn.Module):
                               bias=True)
             self.intro2 = nn.Conv2d(in_channels=7, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
                               bias=True)
-        self.encoders, self.middle_blks, self.downs, width = self.build_encoders(width, enc_blk_nums, middle_blk_num)
+        self.encoders, self.middle_blks, self.downs, original_width = self.build_encoders(width, enc_blk_nums, middle_blk_num)
+        self.HFencoders, self.HFmiddle_blks, self.HFdowns, width = self.build_encoders(width, enc_blk_nums, middle_blk_num)
         width = width//2
         self.ups, self.decoders, self.padder_size, width = self.build_decoders(width, dec_blk_nums)
         self.ending = nn.Conv2d(in_channels=width, out_channels=out_channel, kernel_size=3, padding=1, stride=1, groups=1,
@@ -1070,7 +1071,8 @@ class NAFNetHF(nn.Module):
     def forward(self, inp, pattern=None):
         B, C, H, W = inp.shape # inp range
         self.HighFrequency = torch.ones(B, C, int(H/2), int(W/2))
-        self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands(self.de_gamma((inp + 1.0)/2.0), Logspace=True)
+        self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands((inp + 1.0)/2.0, Logspace=True)
+        # self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands(self.de_gamma((inp + 1.0)/2.0), Logspace=True)
         self.inputs_bands = self.inputs_bands[:,0:7,:,:]
         input_bands = self.inputs_bands
 
@@ -1087,7 +1089,7 @@ class NAFNetHF(nn.Module):
         encs = []
         encs2 = []
 
-        for encoder, down in zip(self.encoders, self.downs):
+        for encoder, down in zip(self.HFencoders, self.HFdowns):
             x2 = encoder(x2)
             encs2.append(x2)
             x2 = down(x2)
@@ -1137,7 +1139,8 @@ class NAFNetHFPick(nn.Module):
                               bias=True)
             self.intro2 = nn.Conv2d(in_channels=7, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
                               bias=True)
-        self.encoders, self.middle_blks, self.downs, width = self.build_encoders(width, enc_blk_nums, middle_blk_num)
+        self.encoders, self.middle_blks, self.downs, original_width = self.build_encoders(width, enc_blk_nums, middle_blk_num)
+        self.HFencoders, self.HFmiddle_blks, self.HFdowns, width = self.build_encoders(width, enc_blk_nums, middle_blk_num)
         width = width//2
         self.ups, self.decoders, self.padder_size, width = self.build_decoders(width, dec_blk_nums)
         self.ending = nn.Conv2d(in_channels=width, out_channels=out_channel, kernel_size=3, padding=1, stride=1, groups=1,
@@ -1257,7 +1260,7 @@ class NAFNetHFPick(nn.Module):
         encs = []
         encs2 = []
 
-        for encoder, down in zip(self.encoders, self.downs):
+        for encoder, down in zip(self.HFencoders, self.HFdowns):
             x2 = encoder(x2)
             encs2.append(x2)
             x2 = down(x2)

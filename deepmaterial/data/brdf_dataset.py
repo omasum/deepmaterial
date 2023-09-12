@@ -548,7 +548,7 @@ class areaDataset(svbrdfDataset):
             else:
                 if self.light_mode == 'point':
                     inputs = self.renderer.render(svbrdf=svbrdfs, random_light=True, colocated=True)
-                    inputs_img = inputs ** 0.4545
+                    inputs_img = inputs ** 0.4545 # inputs no gamma
                 else: # parallel
                     inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False, light_dir = torch.tensor(self.light_dir)) # no gamma
                     inputs_img = inputs ** 0.4545

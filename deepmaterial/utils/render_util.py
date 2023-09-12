@@ -1050,7 +1050,9 @@ class Lighting:
             nbRenderings = self.nbRendering
         else:
             nbRenderings = batch
-        currentLightPos = torch.rand(nbRenderings, 2) * 2 - 1
+        currentLightPos = torch.normal(0, 0.3, (nbRenderings, 2))
+        # currentLightPos = torch.rand(nbRenderings, 2) * 2 - 1
+        currentLightPos = torch.clip(currentLightPos, -1, 1)
         currentLightPos = torch.cat([currentLightPos, torch.ones([nbRenderings, 1]) * lightDistance], axis=-1)
 
         # [batch, n, 3]

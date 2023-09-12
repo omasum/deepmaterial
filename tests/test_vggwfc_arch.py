@@ -1,12 +1,12 @@
 from torchsummary import summary
-from deepmaterial.archs.NAFNet_arch import NAFNetPick, NAFNet, NAFNSDNet, NAFSSDNet
+from deepmaterial.archs.NAFNet_arch import NAFNetPick, NAFNet, NAFNSDNet, NAFSSDNet, NAFNetHFPick
 
 width=32
 enc_blk_nums=[2, 2, 4, 8]
 middle_blk_num=12
 dec_blk_nums=[2, 2, 2, 2]
 
-anet = NAFNetPick(width=width, middle_blk_num=middle_blk_num, enc_blk_nums=enc_blk_nums, dec_blk_nums=dec_blk_nums).to('cuda')
+anet = NAFNetHFPick(width=width, middle_blk_num=middle_blk_num, enc_blk_nums=enc_blk_nums, dec_blk_nums=dec_blk_nums).to('cuda')
 summary(anet, (3,256,256),8)
 
 # myNet = NAFSDNet(width=width, middle_blk_num=middle_blk_num, enc_blk_nums=enc_blk_nums, dec_blk_nums=dec_blk_nums)
