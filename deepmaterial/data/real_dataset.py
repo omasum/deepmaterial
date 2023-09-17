@@ -6,7 +6,7 @@ from torch.utils import data as data
 import torch, random
 
 from deepmaterial.data.data_util import paths_from_folder
-from deepmaterial.utils import FileClient, imfrombytes, img2tensor, random_tangent\
+from deepmaterial.utils import FileClient, imfrombytes, img2tensor, de_gamma, random_tangent\
     , torch_dot, torch_norm, reflect, finit_difference_uv, paraMirror,\
     preprocess, toHDR_torch, toLDR_torch, log_normalization, imresize, Render, PlanarSVBRDF, Lighting
 from deepmaterial.utils.registry import DATASET_REGISTRY
@@ -73,6 +73,8 @@ class RealDataset(data.Dataset):
             inputs = inputs ** 0.4545
         if self.opt.get('log', False):
             inputs = log_normalization(inputs)
+        if self.opt.get('degamma', False):
+            inputs = de_gamma(inputs)
         inputs = preprocess(inputs)
 
         svbrdfs = torch.zeros(10, h, w)

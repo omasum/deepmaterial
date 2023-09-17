@@ -141,9 +141,14 @@ class nafnet(SurfaceNetModel):
             if self.opt['val'].get('save_img', False):
                 results = self.get_current_visuals(self.output.cpu(), self.svbrdf.cpu())
                 save_path = osp.join(self.opt['path']['visualization'], dataset_name)
+                HF_save_path = osp.join(self.opt['path']['visualization'], 'HF')
                 if self.opt['is_train'] or self.opt['val'].get('save_gt', False):
-                    brdf_path=osp.join(save_path, f'svbrdf-{current_iter}-{idx}.png')
+                    brdf_path=osp.join(save_path, val_data['name'][0])
                     self.save_visuals(brdf_path, results['predsvbrdf'], results['gtsvbrdf'])
+                    # ######  only test mode print subbands
+                    if self.HighFrequency.shape[0] == 1:
+                        HF_path = osp.join(HF_save_path, val_data['name'][0])
+                        imwrite(tensor2img(self.HighFrequency[0].unsqueeze(1)*0.5+0.5), HF_path)
                 else:
                     brdf_path=osp.join(save_path, val_data['name'][0])
                     self.save_pre_visuals(brdf_path,results['predsvbrdf'])

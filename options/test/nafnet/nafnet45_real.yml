@@ -1,5 +1,5 @@
 # general settings
-name: pointNafHFL1Loss_allbands_Real_materialGAN  # initialization
+name: Real_NAFNetHFL1Loss_allbands_render  # initialization
 
 model_type: nafnet
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -25,6 +25,7 @@ datasets:
     log: False
     # gamma: False
     gamma: True
+    degamma: True
     light_mode: point
     input_mode: image
     io_backend: 
@@ -49,7 +50,7 @@ network_g:
 #   type: PatchDiscriminator
 # path
 path:
-  pretrain_network_g: /home/sda/cjm/deepmaterial/experiments/NAFNetHFL1Loss_allbands/models/net_g_latest.pth
+  pretrain_network_g: /home/sda/cjm/deepmaterial/experiments/NAFNetHFL1Loss_allbands_render/models/net_g_latest.pth
   strict_load_g: true
   # resume_state: experiments/001_SurfaceNet/training_states/609.state
 

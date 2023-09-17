@@ -651,7 +651,7 @@ class Render():
                 obj_pos = torch.rand((self.nbRendering, 3), dtype=torch.float32) * 2 - 1
                 obj_pos[:, 2] = 0.0
             light_dir, view_dir, light_dis, surface = self.torch_generate(view_pos, light_pos, pos=obj_pos)
-        else:
+        elif light_dir.shape==[3]:
             # parallel light set
             light_dir = light_dir.unsqueeze(0).unsqueeze(2).unsqueeze(3)
             light_dir = light_dir.repeat(1, 1 ,self.opt['size'], self.opt['size'])

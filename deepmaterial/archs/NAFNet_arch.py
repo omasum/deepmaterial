@@ -1070,11 +1070,14 @@ class NAFNetHF(nn.Module):
 
     def forward(self, inp, pattern=None):
         B, C, H, W = inp.shape # inp range
-        self.HighFrequency = torch.ones(B, C, int(H/2), int(W/2))
         self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands((inp + 1.0)/2.0, Logspace=True)
         # self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands(self.de_gamma((inp + 1.0)/2.0), Logspace=True)
+        L_channel = 2.0 * (self.dec['L_origin']/100.0) - 1.0
+        self.HighFrequency = torch.cat([L_channel, self.inputs_bands], 1) # [B, 9, H, W], range(-1,1)
+
         self.inputs_bands = self.inputs_bands[:,0:7,:,:]
         input_bands = self.inputs_bands
+        
 
         input_bands = self.check_image_size(input_bands)
         inp = self.check_image_size(inp)

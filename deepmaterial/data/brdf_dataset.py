@@ -547,6 +547,7 @@ class areaDataset(svbrdfDataset):
                     pattern['pattern'] = self.renderer.lighting.tex*2-1
             else:
                 if self.light_mode == 'point':
+                    # inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False, light_pos = [0,0,2.14], colocated=True)
                     inputs = self.renderer.render(svbrdf=svbrdfs, random_light=True, colocated=True)
                     inputs_img = inputs ** 0.4545 # inputs no gamma
                 else: # parallel

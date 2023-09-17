@@ -143,7 +143,8 @@ def tensor2img(tensor, rgb2bgr=True, out_type=np.uint8, min_max=(0, 1), gamma=Fa
             img_np = img_np**0.4545
         if out_type == np.uint8:
             # Unlike MATLAB, numpy.unit8() WILL NOT round by default.
-            img_np = (img_np * 255.0).round()
+            # img_np = (img_np * 255.0).round()
+            img_np = (img_np * 255.0)
         img_np = img_np.astype(out_type)
         result.append(img_np)
     if len(result) == 1:
@@ -200,6 +201,10 @@ def feat2img_fast(tensor, channel=0, min_max=(0, 1), save_path=None):
         outputs.append(output)
     return outputs
 
+def de_gamma(img):
+    image = img**2.2
+    image = torch.clip(image, min=0.0, max=1.0)
+    return image
 
 def imfrombytes(content, flag='color', float32=False, bgr2rgb=False):
     """Read an image from bytes.
