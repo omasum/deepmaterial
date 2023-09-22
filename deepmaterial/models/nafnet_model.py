@@ -144,13 +144,22 @@ class nafnet(SurfaceNetModel):
                 HF_save_path = osp.join(self.opt['path']['visualization'], 'HF')
                 if self.opt['is_train'] or self.opt['val'].get('save_gt', False):
                     brdf_path=osp.join(save_path, val_data['name'][0])
+                    if 'test' in self.opt['datasets'].keys():
+                        if self.opt['datasets']['test']['input_mode'] == 'pth':
+                            brdf_path = brdf_path[0:-4]
                     self.save_visuals(brdf_path, results['predsvbrdf'], results['gtsvbrdf'])
                     # ######  only test mode print subbands
                     if self.HighFrequency.shape[0] == 1:
                         HF_path = osp.join(HF_save_path, val_data['name'][0])
+                        if 'test' in self.opt['datasets'].keys():
+                            if self.opt['datasets']['test']['input_mode'] == 'pth':
+                                HF_path = HF_path[0:-4]
                         imwrite(tensor2img(self.HighFrequency[0].unsqueeze(1)*0.5+0.5), HF_path)
                 else:
                     brdf_path=osp.join(save_path, val_data['name'][0])
+                    if 'test' in self.opt['datasets'].keys():
+                        if self.opt['datasets']['test']['input_mode'] == 'pth':
+                            brdf_path = brdf_path[0:-4]
                     self.save_pre_visuals(brdf_path,results['predsvbrdf'])
                     
             if with_metrics:

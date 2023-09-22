@@ -509,9 +509,16 @@ class areaDataset(svbrdfDataset):
         self.data_paths = self.data_paths
 
     def __getitem__(self, index):
-        img_path = self.data_paths[index]
-        img_bytes = self.file_client.get(img_path, 'brdf')
-        svbrdf_img = imfrombytes(img_bytes, float32=True, bgr2rgb=True) # original iamges/255: 0-1
+        #! change this command
+        if self.input_mode == 'pth':
+            img_path = self.data_paths[index]
+            new_input = torch.load(img_path)
+            svbrdf_img = new_input.numpy().transpose(1, 2, 0) # [0, 1]
+
+        else:
+            img_path = self.data_paths[index]
+            img_bytes = self.file_client.get(img_path, 'brdf')
+            svbrdf_img = imfrombytes(img_bytes, float32=True, bgr2rgb=True) # original iamges/255: 0-1
         pattern = {}
         h,w,c = svbrdf_img.shape
         # svbrdf_img = imresize(svbrdf_img, scale = 256/288) # 2080ti
@@ -526,7 +533,8 @@ class areaDataset(svbrdfDataset):
         elif self.input_mode == 'image':
             inputs_img = img2tensor(svbrdf_img[:h, :h], bgr2rgb=False)
             inputs = torch.clip(inputs_img, 0.0, 1.0)
-        else:
+
+        elif self.input_mode == 'render':
             if self.light_mode == 'area':
                 if isinstance(self.lighting, list):
                     inputs = []
@@ -553,13 +561,25 @@ class areaDataset(svbrdfDataset):
                 else: # parallel
                     inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False, light_dir = torch.tensor(self.light_dir)) # no gamma
                     inputs_img = inputs ** 0.4545
+
+        elif self.input_mode == 'pth':
+            inputs = torch.split(new_input, split_size_or_sections=int(new_input.shape[2]/5.0), dim=2)[0]
+            inputs_img = inputs ** 0.4545
                 
+        #! delete this command
+        # new_svbrdfimg = torch.from_numpy(svbrdf_img.transpose(2, 0, 1)) # [0,1], [3, h, w*5]
+        # new_img, newn, newd, newr, news = torch.split(new_svbrdfimg, split_size_or_sections=int(new_svbrdfimg.shape[2]/5), dim=-1) # [3, h, w]
+        # new_svbrdfimg = torch.cat([newn, newd, newr, news], dim=-1) # [3, h, w*4]
+        # new_inputs = torch.cat([inputs, new_svbrdfimg], dim=-1) # [0,1]
+        # torch.save(new_inputs, '/home/cjm/dataset/rerender_test2/' + os.path.basename(img_path) + '.pth')
+        
         if not self.opt.get('gamma', True):
             inputs = inputs ** 0.4545
 
         if self.opt.get('log', False):
             inputs = log_normalization(inputs)
         inputs = preprocess(inputs)
+        
         result = {
             'inputs': inputs, # input of net, without gamma
             'imgs': inputs_img, # show, with gamma

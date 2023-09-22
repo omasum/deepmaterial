@@ -1238,17 +1238,25 @@ class NAFNetHFPick(nn.Module):
     def forward(self, inp, pattern=None):
         B, C, H, W = inp.shape # inp range
         self.HighFrequency = torch.ones(B, C, int(H/2), int(W/2))
-        self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands(self.de_gamma((inp + 1.0)/2.0), Logspace=True)
-        self.inputs_bands = self.inputs_bands[:,0:7,:,:]
+        self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands((inp + 1.0)/2.0, Logspace=True)
+        self.inputs_bands = self.inputs_bands * 0.5 + 0.5 # range (0,1)
+        self.inputs_bands = self.inputs_bands[:,0:7,:,:] # [B, 7, H, W]
 
-        feature = self.weightencoder(inp)
+        L_channel = 2.0 * (self.dec['L_origin']/100.0) - 1.0
+       
+
+        feature = self.weightencoder(inp) 
         feature = feature.view(B, -1) # [B, 512*8*8]
         feature_mask = self.classifier(feature) # [B,7]
         feature_mask_mean = torch.mean(feature_mask, dim=1, keepdim=True) # [B,1]
         self.feature_mask = torch.where(feature_mask >= feature_mask_mean, torch.ones_like(feature_mask), torch.zeros_like(feature_mask)) # [B,7]
         feature_mask = self.feature_mask.unsqueeze(-1).unsqueeze(-1) # [B, 7, 1, 1]
         
-        self.masked_HF = self.inputs_bands * feature_mask
+        self.masked_HF = self.inputs_bands * feature_mask # range [0,1]
+        self.masked_HF = 2.0 * self.masked_HF - 1.0 # range [-1,1]
+
+        self.HighFrequency = torch.cat([L_channel, self.masked_HF], 1) # [B, 9, H, W], range(-1,1)
+
 
         input_bands = self.check_image_size(self.masked_HF)
         inp = self.check_image_size(inp)

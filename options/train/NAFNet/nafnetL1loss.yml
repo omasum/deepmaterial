@@ -1,5 +1,5 @@
 # general settings
-name: NAFNetHFRenderLoss_allbands_render40w  # initialization
+name: NAFNetHFPickRenderLoss_allbands_sift  # initialization
 
 model_type: nafnet
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -56,7 +56,7 @@ datasets:
 
 # network structures
 network_g:
-  type: NAFNetHF
+  type: NAFNetHFPick
   width: 32
   enc_blk_nums: [2, 2, 4, 8]
   middle_blk_num: 12
@@ -86,11 +86,11 @@ train:
     betas: [0.9, 0.9]
   scheduler:
     type: TrueCosineAnnealingLR
-    T_max: 400000
+    T_max: 200000
     eta_min: !!float 1e-7
     # milestones: [1,5,10,15]
   # total_iter: 300000
-  total_iter: 400000
+  total_iter: 200000
   warmup_iter: -1  # no warm up
 
   # losses

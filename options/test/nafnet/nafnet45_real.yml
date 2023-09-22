@@ -1,5 +1,5 @@
 # general settings
-name: Real_NAFNetHFL1Loss_allbands_render  # initialization
+name: Real_NAFNetHFPickRenderLoss_allbands_render  # initialization
 
 model_type: nafnet
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -34,7 +34,7 @@ datasets:
 
 # network structures
 network_g:
-  type: NAFNetHF
+  type: NAFNetHFPick
   width: 32
   enc_blk_nums: [2, 2, 4, 8]
   middle_blk_num: 12
@@ -50,7 +50,7 @@ network_g:
 #   type: PatchDiscriminator
 # path
 path:
-  pretrain_network_g: /home/sda/cjm/deepmaterial/experiments/NAFNetHFL1Loss_allbands_render/models/net_g_latest.pth
+  pretrain_network_g: /home/sda/cjm/deepmaterial/experiments/NAFNetHFPickRenderLoss_allbands/models/net_g_latest.pth
   strict_load_g: true
   # resume_state: experiments/001_SurfaceNet/training_states/609.state
 

@@ -18,7 +18,8 @@ datasets:
       toLDR: True
       lampIntensity: 12
     # data_path: /home/sda/svBRDFs/testBlended # Ruby
-    data_path: /home/cjm/dataset/rerender_test
+    # data_path: /home/cjm/dataset/rerender_test
+    data_path: /home/cjm/dataset/rerender_test2
     # data_path: /home/sda/cjm/MaterialGAN
     # data_path: /home/xh/cjm/18single_image/Data_Deschaintre18/trainBlended # 2080Ti
     # data_path: /home/xh/cjm/18single_image/Data_Deschaintre18/testBlended # 2080Ti
@@ -26,7 +27,8 @@ datasets:
     log: False
     gamma: True
     light_mode: point
-    input_mode: render
+    input_mode: pth
+    # input_mode: render
     io_backend: 
       type: disk
     # len: 18

@@ -36,7 +36,6 @@ def test_pipeline(root_path):
 
     # create model
     model = build_model(opt)
-    test_set.__getitem__(0)
 
     for test_loader in test_loaders:
         test_set_name = test_loader.dataset.opt['name']
