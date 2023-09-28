@@ -12,6 +12,7 @@ import cv2 as cv
 from torch.nn import functional as F
 from deepmaterial.utils.wrapper_util import timmer
 import nvdiffrast.torch as dr
+import os
 
 lightDistance = 2.14
 # lightDistance = 1.14
@@ -668,6 +669,7 @@ class Render():
             self.view_dir = view_dir
             self.light_dis = light_dis
             self.surface = surface
+            self.light_pos = light_pos
         if load_dirs:
             light_dir, view_dir, light_dis, surface = self.light_dir, self.view_dir, self.light_dis, self.surface
         n, d, r, s = svbrdf._seperate_brdf(n_xy=n_xy, r_single=r_single)
@@ -685,7 +687,9 @@ class Render():
             render_result.squeeze_(0)
         if toLDR:
             render_result = toLDR_torch(render_result)
+            self.LDRresult = render_result
             render_result = toHDR_torch(render_result)
+
         return render_result
 
     def render_panel_single_point(self, brdf, l=None, wi=None, dis=None, wo=None, n_xy=False,
@@ -1462,7 +1466,7 @@ if __name__ == "__main__":
     brdfArgs['size'] = 256
     brdfArgs['order'] = 'pndrs'
     brdfArgs['toLDR'] = True
-    brdfArgs['lampIntensity'] = 12
+    brdfArgs['lampIntensity'] = 20
     import torchvision
     if True:
         path = '/home/sda/svBRDFs/testBlended/0000001;PolishedMarbleFloor_01Xmetal_bumpy_squares;1X1.png' # [256, 256*5]indrs
@@ -1476,7 +1480,7 @@ if __name__ == "__main__":
         # svbrdf.brdf[6:7,:,:] = torch.ones_like(svbrdf.brdf[0:1,:,:])*(-0.8)
         # svbrdf.brdf[7:10,:,:] = torch.ones_like(svbrdf.brdf[0:1,:,:])*(1.0)
         import time
-        if True:
+        if False:
             #====================== Rendering test============================
             renderer = Render(brdfArgs)
             start = time.time()
@@ -1489,11 +1493,11 @@ if __name__ == "__main__":
             #====================== Point wogamma Rendering test============================
             renderer = Render(brdfArgs)
             start = time.time()
-            res = renderer.render(svbrdf, random_light=False, colocated=True)
+            res = renderer.render(svbrdf, random_light=True, colocated=True)
             print('point rendering:', time.time()-start)
             torchvision.utils.save_image(
                 res, f'tmp/wogammatest-point.png', nrow=1, padding=1, normalize=False)
-        if True:
+        if False:
             #======================Parallel Rendering test============================
             renderer = Render(brdfArgs)
             start = time.time()

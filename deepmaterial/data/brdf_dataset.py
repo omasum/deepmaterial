@@ -11,6 +11,7 @@ from deepmaterial.utils import FileClient, imfrombytes, img2tensor, random_tange
     preprocess, toHDR_torch, toLDR_torch, log_normalization, imresize, Render, PlanarSVBRDF, Lighting
 from deepmaterial.utils.registry import DATASET_REGISTRY
 from deepmaterial.utils.render_util import PolyRender, RectLighting
+import cv2
 
 
 @DATASET_REGISTRY.register()
@@ -556,8 +557,24 @@ class areaDataset(svbrdfDataset):
             else:
                 if self.light_mode == 'point':
                     # inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False, light_pos = [0,0,2.14], colocated=True)
-                    inputs = self.renderer.render(svbrdf=svbrdfs, random_light=True, colocated=True)
+                    inputs = self.renderer.render(svbrdf=svbrdfs, random_light=True, colocated=True, keep_dirs=True)
                     inputs_img = inputs ** 0.4545 # inputs no gamma
+
+                    # when test in render mode, save the image
+                    # save_input = self.renderer.LDRresult # tensor [3, 256, 256], range (0, 255)
+                    # save_path = os.path.join("alltest", os.path.basename(img_path))
+                    # cv2.imwrite(save_path, cv2.cvtColor(save_input.numpy().transpose(1,2,0).astype(np.uint8), cv2.COLOR_RGB2BGR))
+                    # save light config
+                    # floder_path = "alltest_config"
+                    # config_path = os.path.join(floder_path, os.path.basename(img_path))
+                    # os.makedirs(config_path, exist_ok=True)
+                    # light = self.renderer.light_pos.numpy().reshape(1, 3)
+                    # light_power = np.array([12.0, 12.0, 12.0])
+                    # np.savetxt(os.path.join(config_path, 'light_pos.txt'), light, delimiter=',', fmt='%.4f')
+                    # np.savetxt(os.path.join(config_path, 'camera_pos.txt'), light, delimiter=',', fmt='%.4f')
+                    # np.savetxt(os.path.join(config_path, 'light_power.txt'), light_power.reshape(1,3), delimiter=',', fmt='%.4f')
+                    # np.savetxt(os.path.join(config_path, 'image_size.txt'), np.array([2]), delimiter=',', fmt='%.4f')
+
                 else: # parallel
                     inputs = self.renderer.render(svbrdf=svbrdfs, random_light=False, light_dir = torch.tensor(self.light_dir)) # no gamma
                     inputs_img = inputs ** 0.4545
@@ -571,10 +588,14 @@ class areaDataset(svbrdfDataset):
         # new_img, newn, newd, newr, news = torch.split(new_svbrdfimg, split_size_or_sections=int(new_svbrdfimg.shape[2]/5), dim=-1) # [3, h, w]
         # new_svbrdfimg = torch.cat([newn, newd, newr, news], dim=-1) # [3, h, w*4]
         # new_inputs = torch.cat([inputs, new_svbrdfimg], dim=-1) # [0,1]
-        # torch.save(new_inputs, '/home/cjm/dataset/rerender_test2/' + os.path.basename(img_path) + '.pth')
+        # torch.save(new_inputs, '/home/cjm/dataset/rerender_test_15/' + os.path.basename(img_path) + '.pth')
         
         if not self.opt.get('gamma', True):
             inputs = inputs ** 0.4545
+
+        if self.opt.get('degamma', False):
+            inputs = inputs ** 2.2
+            inputs = torch.clip(inputs, min=0.0, max=1.0)
 
         if self.opt.get('log', False):
             inputs = log_normalization(inputs)

@@ -1,6 +1,6 @@
 # general settings
-# name: ZLHTest  # initialization
-name: CJM_NAFNetHFPickRenderLoss_allbands_render_allset  # initialization
+name: ZTest  # initialization
+# name: CJM_NAFNetHFPickRenderLoss_allbands_render_allset  # initialization
 
 model_type: nafnet
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -17,8 +17,8 @@ datasets:
       order: pndrs
       toLDR: True
       lampIntensity: 12
-    # data_path: /home/sda/svBRDFs/testBlended # Ruby
-    data_path: /home/cjm/dataset/rerender_test
+    data_path: /home/cjm/dataset/all_test/GT # Ruby
+    # data_path: /home/cjm/dataset/rerender_test
     # data_path: /home/sda/cjm/MaterialGAN
     # data_path: /home/xh/cjm/18single_image/Data_Deschaintre18/trainBlended # 2080Ti
     # data_path: /home/xh/cjm/18single_image/Data_Deschaintre18/testBlended # 2080Ti
@@ -49,7 +49,7 @@ network_g:
 #   type: PatchDiscriminator
 # path
 path:
-  pretrain_network_g: /home/sda/cjm/deepmaterial/experiments/NAFNetHFPickRenderLoss_allbands/models/net_g_latest.pth
+  pretrain_network_g: /home/sda/cjm/deepmaterial/experiments/NAFNetHFPickRenderLoss_allbands_sift/models/net_g_latest.pth
   strict_load_g: true
   # resume_state: experiments/001_SurfaceNet/training_states/609.state
 

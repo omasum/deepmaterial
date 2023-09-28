@@ -16,7 +16,7 @@ import time
 import os
 from deepmaterial.utils.img_util import imwrite,tensor2img
 
-paths = 'results/NAFNetHFRenderLoss_allbands_render_allset/visualization/areaDataset' # [256, 256*5]indrs
+paths = 'results/CJM_NAFNetHFRenderLoss_allbands_render_allset/visualization/areaDataset' # [256, 256*5]indrs
 target = "/home/cjm/dataset/rerender_test"
 
 for name in os.listdir(paths):

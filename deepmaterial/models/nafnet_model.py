@@ -4,6 +4,7 @@ from deepmaterial.models.surfacenet_model import SurfaceNetModel
 from deepmaterial.utils.img_util import imwrite,tensor2img
 from deepmaterial.utils.registry import MODEL_REGISTRY
 from deepmaterial.utils.render_util import torch_norm
+import torchvision as tv
 import torch
 import importlib
 import numpy as np
@@ -154,7 +155,12 @@ class nafnet(SurfaceNetModel):
                         if 'test' in self.opt['datasets'].keys():
                             if self.opt['datasets']['test']['input_mode'] == 'pth':
                                 HF_path = HF_path[0:-4]
-                        imwrite(tensor2img(self.HighFrequency[0].unsqueeze(1)*0.5+0.5), HF_path)
+                        
+                            highfrequency = tv.utils.make_grid(self.HighFrequency[0].unsqueeze(1)*0.5+0.5, padding=0)
+                            
+                        imwrite(cv2.cvtColor(highfrequency.cpu().numpy().transpose(1,2,0), cv2.COLOR_RGB2BGR), HF_path, float2int=True)
+                        # cv2.imwrite(HF_path, cv2.cvtColor((highfrequency * 255.0).cpu().numpy().transpose(1,2,0), cv2.COLOR_RGB2BGR))
+                        # imwrite(tensor2img(self.HighFrequency.unsqueeze(1)*0.5+0.5), HF_path)
                 else:
                     brdf_path=osp.join(save_path, val_data['name'][0])
                     if 'test' in self.opt['datasets'].keys():
