@@ -222,6 +222,8 @@ def imfrombytes(content, flag='color', float32=False, bgr2rgb=False):
     img_np = np.frombuffer(content, np.uint8)
     imread_flags = {'color': cv2.IMREAD_COLOR, 'grayscale': cv2.IMREAD_GRAYSCALE, 'unchanged': cv2.IMREAD_UNCHANGED}
     img = cv2.imdecode(img_np, imread_flags[flag])
+    if img.shape[0] != 256:
+        img = cv2.resize(img,[256,256],interpolation=cv2.INTER_AREA)
     if bgr2rgb:
         img=img[:,:,::-1]
     if float32:

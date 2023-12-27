@@ -1,5 +1,5 @@
 # general settings
-name: ZTest  # initialization
+name: CJM_NAFNetHFPickSiftRenderLoss_render_allset_oripoint  # initialization
 # name: CJM_NAFNetHFPickRenderLoss_allbands_render_allset  # initialization
 
 model_type: nafnet
