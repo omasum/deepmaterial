@@ -203,6 +203,121 @@ class NAFBlock(nn.Module):
 
 
 @ARCH_REGISTRY.register()
+class PlainNet(nn.Module):
+
+    def __init__(self, in_channel=3, out_channel=10, width=16, middle_blk_num=1, enc_blk_nums=[], dec_blk_nums=[], res=False, tanh=True, **kwargs):
+        super().__init__()
+
+        self.res = res
+        self.tanh = nn.Tanh() if tanh else tanh
+        self.usePattern = kwargs.get('usePattern', False)
+        if self.usePattern:
+            self.intro = nn.Conv2d(in_channels=in_channel, out_channels=int(width*3/4), kernel_size=3, padding=1, stride=1, groups=1,
+                              bias=True)
+            self.introPattern = self.build_intropattern(int(width/4))
+        else:
+            self.intro = nn.Conv2d(in_channels=in_channel, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
+                              bias=True)
+        self.encoders, self.middle_blks, self.downs, width = self.build_encoders(width, enc_blk_nums, middle_blk_num)
+        self.ups, self.decoders, self.padder_size, width = self.build_decoders(width, dec_blk_nums)
+        self.ending = nn.Conv2d(in_channels=width, out_channels=out_channel, kernel_size=3, padding=1, stride=1, groups=1,
+                              bias=True)
+
+    def build_intropattern(self, width):
+        introPattern = []
+        introPattern.append(nn.Conv2d(in_channels=3, out_channels=width, kernel_size=2, stride=2))
+        introPattern.append(PlainBlock(width))
+        introPattern.append(nn.Conv2d(in_channels=width, out_channels=width, kernel_size=2, stride=2))
+        introPattern.append(PlainBlock(width))
+        return nn.Sequential(*introPattern)
+
+    def build_encoders(self, width, enc_blk_nums, middle_blk_num):
+        encoders = nn.ModuleList()
+        downs = nn.ModuleList()
+        for num in enc_blk_nums:
+            encoders.append(
+                nn.Sequential(
+                    *[PlainBlock(width) for _ in range(num)]
+                )
+            )
+            downs.append(
+                nn.Conv2d(width, 2*width, 2, 2)
+            )
+            width = width * 2
+
+        middle_blks = \
+            nn.Sequential(
+                *[PlainBlock(width) for _ in range(middle_blk_num)]
+            )
+        return encoders, middle_blks, downs, width
+
+    def build_decoders(self, width, dec_blk_nums):
+        ups = nn.ModuleList()
+        decoders = nn.ModuleList()
+        for num in dec_blk_nums:
+            ups.append(
+                nn.Sequential(
+                    nn.Conv2d(width, width * 2, 1, bias=False),
+                    nn.PixelShuffle(2)
+                )
+            )
+            width = width // 2
+            decoders.append(
+                nn.Sequential(
+                    *[PlainBlock(width) for _ in range(num)]
+                )
+            )
+
+        padder_size = 2 ** len(self.encoders)
+        return ups, decoders, padder_size, width
+
+    def forward(self, inp, pattern=None):
+        B, C, H, W = inp.shape
+        self.HighFrequency = torch.ones(B, C, int(H/2), int(W/2))
+        inp = self.check_image_size(inp)
+
+        x = self.intro(inp) # [b,width,h,w]
+        if self.usePattern:
+            featPattern = self.introPattern(pattern)
+            x = torch.cat([x, featPattern.broadcast_to(B,featPattern.shape[1], H, W)], dim = 1)
+        encs = []
+
+        for encoder, down in zip(self.encoders, self.downs):
+            x = encoder(x)
+            encs.append(x)
+            x = down(x)
+
+        x = self.middle_blks(x) # [8,512,16,16]
+
+        for decoder, up, enc_skip in zip(self.decoders, self.ups, encs[::-1]):
+            x = up(x)
+            x = x + enc_skip
+            x = decoder(x)
+
+        x = self.ending(x)
+        if self.res:
+            x = x + inp
+        if self.tanh:
+            x = self.tanh(x)
+        else:
+            x = x.clamp(-1+1e-6, 1-1e-6)
+        return self.HighFrequency, x[:, :, :H, :W]
+
+    def check_image_size(self, x):
+        _, _, h, w = x.size()
+        mod_pad_h = (self.padder_size - h % self.padder_size) % self.padder_size
+        mod_pad_w = (self.padder_size - w % self.padder_size) % self.padder_size
+        x = F.pad(x, (0, mod_pad_w, 0, mod_pad_h))
+        return x
+
+cfg = {
+    'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
+    'VGG13': [64, 64, 'M', 128, 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
+    'VGG16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
+    'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
+}
+
+@ARCH_REGISTRY.register()
 class NAFNet(nn.Module):
 
     def __init__(self, in_channel=3, out_channel=10, width=16, middle_blk_num=1, enc_blk_nums=[], dec_blk_nums=[], res=False, tanh=True, **kwargs):
@@ -316,6 +431,7 @@ cfg = {
     'VGG16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
     'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
 }
+
 
 @ARCH_REGISTRY.register()
 class NAFNetPick(nn.Module):
@@ -981,6 +1097,66 @@ class NAFNSDNet_initial(nn.Module):
         return x
 
 @ARCH_REGISTRY.register()
+class PlainBlock(nn.Module):
+    def __init__(self, c, DW_Expand=2, FFN_Expand=2, drop_out_rate=0.):
+        super().__init__()
+        dw_channel = c * DW_Expand
+        self.conv1 = nn.Conv2d(in_channels=c, out_channels=dw_channel, kernel_size=1, padding=0, stride=1, groups=1, bias=True)
+        self.conv2 = nn.Conv2d(in_channels=dw_channel, out_channels=dw_channel, kernel_size=3, padding=1, stride=1, groups=dw_channel,
+                               bias=True)
+        self.conv3 = nn.Conv2d(in_channels=dw_channel, out_channels=c, kernel_size=1, padding=0, stride=1, groups=1, bias=True)
+        
+        # Simplified Channel Attention
+        self.sca = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(in_channels=dw_channel // 2, out_channels=dw_channel // 2, kernel_size=1, padding=0, stride=1,
+                      groups=1, bias=True),
+        )
+
+        # SimpleGate
+        self.sg = SimpleGate()
+        
+        ## Relu
+        self.relu = nn.ReLU()
+
+        ffn_channel = FFN_Expand * c
+        self.conv4 = nn.Conv2d(in_channels=c, out_channels=ffn_channel, kernel_size=1, padding=0, stride=1, groups=1, bias=True)
+        self.conv5 = nn.Conv2d(in_channels=ffn_channel, out_channels=c, kernel_size=1, padding=0, stride=1, groups=1, bias=True)
+
+        self.norm1 = LayerNorm2d(c)
+        self.norm2 = LayerNorm2d(c)
+
+        self.dropout1 = nn.Dropout(drop_out_rate) if drop_out_rate > 0. else nn.Identity()
+        self.dropout2 = nn.Dropout(drop_out_rate) if drop_out_rate > 0. else nn.Identity()
+
+        self.beta = nn.Parameter(torch.zeros((1, c, 1, 1)), requires_grad=True)
+        self.gamma = nn.Parameter(torch.zeros((1, c, 1, 1)), requires_grad=True)
+
+    def forward(self, inp):
+        x = inp
+
+        x = self.conv1(x)
+        x = self.conv2(x)
+        
+        x = self.relu(x)
+        
+        x = self.conv3(x)
+
+        x = self.dropout1(x)
+
+        y = inp + x * self.beta
+
+        x = self.conv4(y)
+        
+        x = self.relu(x)
+        
+        x = self.conv5(x)
+
+        x = self.dropout2(x)
+
+        return y + x * self.gamma
+
+@ARCH_REGISTRY.register()
 class NAFNetHF(nn.Module):
 
     def __init__(self, in_channel=3, out_channel=10, width=16, middle_blk_num=1, enc_blk_nums=[], dec_blk_nums=[], res=False, tanh=True, **kwargs):
@@ -1372,6 +1548,185 @@ class NAFNetHFPick(nn.Module):
             decoders.append(
                 nn.Sequential(
                     *[NAFBlock(width) for _ in range(num)]
+                )
+            )
+
+        padder_size = 2 ** len(self.encoders)
+        return ups, decoders, padder_size, width
+
+    def forward(self, inp, pattern=None):
+        B, C, H, W = inp.shape # inp range
+        self.HighFrequency = torch.ones(B, C, int(H/2), int(W/2))
+        self.inputs_bands, self.dec = materialmodifier_L6.Show_subbands((inp + 1.0)/2.0, Logspace=True)
+        self.inputs_bands = self.inputs_bands * 0.5 + 0.5 # range (0,1)
+        self.inputs_bands = self.inputs_bands[:,0:7,:,:] # [B, 7, H, W]
+
+        L_channel = 2.0 * (self.dec['L_origin']/100.0) - 1.0
+       
+
+        feature = self.weightencoder(inp) 
+        feature = feature.view(B, -1) # [B, 512*8*8]
+        feature_mask = self.classifier(feature) # [B,7]
+        feature_mask_mean = torch.mean(feature_mask, dim=1, keepdim=True) # [B,1]
+        self.feature_mask = torch.where(feature_mask >= feature_mask_mean, torch.ones_like(feature_mask), torch.zeros_like(feature_mask)) # [B,7]
+        feature_mask = self.feature_mask.unsqueeze(-1).unsqueeze(-1) # [B, 7, 1, 1]
+        
+        self.masked_HF = self.inputs_bands * feature_mask # range [0,1]
+        self.masked_HF = 2.0 * self.masked_HF - 1.0 # range [-1,1]
+
+        self.HighFrequency = torch.cat([L_channel, self.masked_HF], 1) # [B, 9, H, W], range(-1,1)
+
+
+        input_bands = self.check_image_size(self.masked_HF)
+        inp = self.check_image_size(inp)
+
+        x2 = self.intro2(input_bands)
+        x = self.intro(inp)
+
+        if self.usePattern:
+            featPattern = self.introPattern(pattern)
+            x = torch.cat([x, featPattern.broadcast_to(B,featPattern.shape[1], H, W)], dim = 1)
+        
+        encs = []
+        encs2 = []
+
+        for encoder, down in zip(self.HFencoders, self.HFdowns):
+            x2 = encoder(x2)
+            encs2.append(x2)
+            x2 = down(x2)
+        for encoder, down in zip(self.encoders, self.downs):
+            x = encoder(x)
+            encs.append(x)
+            x = down(x)
+
+        x = self.middle_blks(torch.cat([x, x2], dim=1)) # [1024]->512
+
+        for decoder, up, enc_skip in zip(self.decoders, self.ups, encs[::-1]):
+            x = up(x) # 256
+            x = x + enc_skip
+            x = decoder(x)
+
+        x = self.ending(x)
+        if self.res:
+            x = x + inp
+        if self.tanh:
+            x = self.tanh(x)
+        else:
+            x = x.clamp(-1+1e-6, 1-1e-6)
+        return self.HighFrequency, x[:, :, :H, :W]
+
+    def check_image_size(self, x):
+        _, _, h, w = x.size()
+        mod_pad_h = (self.padder_size - h % self.padder_size) % self.padder_size
+        mod_pad_w = (self.padder_size - w % self.padder_size) % self.padder_size
+        x = F.pad(x, (0, mod_pad_w, 0, mod_pad_h))
+        return x
+    
+@ARCH_REGISTRY.register()
+class PlainNetHFPick(nn.Module):
+
+    def __init__(self, in_channel=3, out_channel=10, width=16, middle_blk_num=1, enc_blk_nums=[], dec_blk_nums=[], res=False, tanh=True, **kwargs):
+        super().__init__()
+
+        self.res = res
+        self.tanh = nn.Tanh() if tanh else tanh
+        self.usePattern = kwargs.get('usePattern', False)
+        if self.usePattern:
+            self.intro = nn.Conv2d(in_channels=in_channel, out_channels=int(width*3/4), kernel_size=3, padding=1, stride=1, groups=1,
+                              bias=True)
+            self.introPattern = self.build_intropattern(int(width/4))
+        else:
+            self.intro = nn.Conv2d(in_channels=in_channel, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
+                              bias=True)
+            self.intro2 = nn.Conv2d(in_channels=7, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
+                              bias=True)
+        self.encoders, self.middle_blks, self.downs, original_width = self.build_encoders(width, enc_blk_nums, middle_blk_num)
+        self.HFencoders, self.HFmiddle_blks, self.HFdowns, width = self.build_encoders(width, enc_blk_nums, middle_blk_num)
+        width = width//2
+        self.ups, self.decoders, self.padder_size, width = self.build_decoders(width, dec_blk_nums)
+        self.ending = nn.Conv2d(in_channels=width, out_channels=out_channel, kernel_size=3, padding=1, stride=1, groups=1,
+                              bias=True)
+        self.sigmoid = nn.Sigmoid()
+        self.weightencoder = self._make_layers(cfg['VGG11'])
+        self.classifier = self.Classifier(512*8*8, 7)
+
+    def build_intropattern(self, width):
+        introPattern = []
+        introPattern.append(nn.Conv2d(in_channels=3, out_channels=width, kernel_size=2, stride=2))
+        introPattern.append(PlainBlock(width))
+        introPattern.append(nn.Conv2d(in_channels=width, out_channels=width, kernel_size=2, stride=2))
+        introPattern.append(PlainBlock(width))
+        return nn.Sequential(*introPattern)
+
+    def de_gamma(self,img):
+        image = img**2.2
+        image = torch.clip(image, min=0.0, max=1.0)
+        return image
+
+    def Classifier(self,in_chnnel,out_chnnel):
+        layers = []
+        layers += [nn.Linear(in_chnnel,out_chnnel)]
+        layers += [nn.Sigmoid()] # output weight must in (0,1)
+        return nn.Sequential(*layers)
+    
+    def _make_layers(self, cfg):
+        layers = []
+        in_channels = 3
+        for x in cfg:
+            if x == 'M':
+                layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+            else:
+                layers += [nn.Conv2d(in_channels, x, kernel_size=3, padding=1),
+                           nn.BatchNorm2d(x),
+                           nn.ReLU(inplace=True)]
+                in_channels = x
+        layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
+        return nn.Sequential(*layers)
+
+    def build_encoders(self, width, enc_blk_nums, middle_blk_num):
+        encoders = nn.ModuleList()
+        downs = nn.ModuleList()
+        for num in enc_blk_nums:
+            encoders.append(
+                nn.Sequential(
+                    *[PlainBlock(width) for _ in range(num)]
+                )
+            )
+            downs.append(
+                nn.Conv2d(width, 2*width, 2, 2)
+            )
+            width = width * 2
+        width = width * 2 # two branch cat
+        middle_blks = \
+            nn.Sequential(
+                *[PlainBlock(width) for _ in range(middle_blk_num)],
+                nn.Conv2d(width, width//2, 1, bias=False)
+            )
+        return encoders, middle_blks, downs, width
+
+    def up(self, width):
+        ups = nn.ModuleList()
+        ups.append(
+                nn.Sequential(
+                    nn.Conv2d(width, width // 2, 1, bias=False)
+                )
+        )
+        return ups
+
+    def build_decoders(self, width, dec_blk_nums):
+        ups = nn.ModuleList()
+        decoders = nn.ModuleList()
+        for num in dec_blk_nums:
+            ups.append(
+                nn.Sequential(
+                    nn.Conv2d(width, width * 2, 1, bias=False),
+                    nn.PixelShuffle(2)
+                )
+            )
+            width = width // 2
+            decoders.append(
+                nn.Sequential(
+                    *[PlainBlock(width) for _ in range(num)]
                 )
             )
 
