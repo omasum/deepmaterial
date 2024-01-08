@@ -561,9 +561,9 @@ class areaDataset(svbrdfDataset):
                     inputs_img = inputs ** 0.4545 # inputs no gamma
 
                     # when test in render mode, save the image
-                    save_input = self.renderer.LDRresult # tensor [3, 256, 256], range (0, 255)
-                    save_path = os.path.join("alltest", os.path.basename(img_path))
-                    cv2.imwrite(save_path, cv2.cvtColor(save_input.numpy().transpose(1,2,0).astype(np.uint8), cv2.COLOR_RGB2BGR))
+                    # save_input = self.renderer.LDRresult # tensor [3, 256, 256], range (0, 255)
+                    # save_path = os.path.join("alltest", os.path.basename(img_path))
+                    # cv2.imwrite(save_path, cv2.cvtColor(save_input.numpy().transpose(1,2,0).astype(np.uint8), cv2.COLOR_RGB2BGR))
                     # save light config
                     # floder_path = "alltest_config"
                     # config_path = os.path.join(floder_path, os.path.basename(img_path))
